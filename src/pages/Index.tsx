@@ -1,25 +1,24 @@
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 import Logo from "@/components/Logo";
+import CryptoChart from "@/components/CryptoChart";
+import LiveTicker from "@/components/LiveTicker";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Shield, TrendingUp, Users } from "lucide-react";
+import { useEffect } from "react";
 
 const Index = () => {
+  const navigate = useNavigate();
+  const { user, isLoading } = useAuth();
+
+  useEffect(() => {
+    if (user && !isLoading) {
+      navigate("/dashboard");
+    }
+  }, [user, isLoading, navigate]);
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border/50 backdrop-blur-sm sticky top-0 z-50 bg-background/80">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Logo size="md" />
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
-              Login
-            </Button>
-            <Button className="bg-primary text-primary-foreground hover:bg-primary/90 glow-gold-sm">
-              Get Started
-              <ArrowRight className="ml-2 w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      </header>
 
       {/* Hero Section */}
       <section className="relative py-24 lg:py-32 overflow-hidden">
