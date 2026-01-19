@@ -9,8 +9,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { CheckCircle, Clock, XCircle, AlertTriangle, ArrowUpCircle } from "lucide-react";
+import { CheckCircle, Clock, XCircle, AlertTriangle, ArrowUpCircle, Wallet, CreditCard, Landmark, Bitcoin } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+
+interface PaymentMethod {
+  id: string;
+  name: string;
+  type: string;
+  icon: string;
+  description: string | null;
+}
 
 interface Withdrawal {
   id: string;
@@ -19,6 +28,7 @@ interface Withdrawal {
   status: string;
   admin_txid: string | null;
   decline_reason: string | null;
+  payment_method: string | null;
   created_at: string;
 }
 
@@ -26,6 +36,21 @@ interface WithdrawalSettings {
   min_investment_days: number;
   min_withdrawal_amount: number;
 }
+
+const getPaymentIcon = (icon: string) => {
+  switch (icon) {
+    case "bitcoin":
+      return <Bitcoin className="w-5 h-5" />;
+    case "usdt":
+      return <Wallet className="w-5 h-5" />;
+    case "paypal":
+      return <CreditCard className="w-5 h-5" />;
+    case "bank":
+      return <Landmark className="w-5 h-5" />;
+    default:
+      return <Wallet className="w-5 h-5" />;
+  }
+};
 
 const Withdraw = () => {
   const { user, profile, isLoading } = useAuth();
@@ -35,6 +60,8 @@ const Withdraw = () => {
   } = useBTCPrice();
   const currency = profile?.preferred_currency || "USD";
   
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [selectedMethod, setSelectedMethod] = useState<string>("");
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [settings, setSettings] = useState<WithdrawalSettings | null>(null);
   const [balance, setBalance] = useState(0);
@@ -53,8 +80,25 @@ const Withdraw = () => {
   useEffect(() => {
     if (user) {
       fetchData();
+      fetchPaymentMethods();
     }
   }, [user]);
+
+  const fetchPaymentMethods = async () => {
+    const { data, error } = await supabase
+      .from("payment_methods")
+      .select("*")
+      .in("type", ["withdrawal", "both"])
+      .eq("is_active", true)
+      .order("display_order", { ascending: true });
+
+    if (!error && data) {
+      setPaymentMethods(data);
+      if (data.length > 0) {
+        setSelectedMethod(data[0].id);
+      }
+    }
+  };
 
   const fetchData = async () => {
     if (!user) return;
@@ -88,7 +132,6 @@ const Withdraw = () => {
     }
 
     // Use the database function for accurate balance calculation
-    // This properly accounts for invested amounts
     const { data: balanceData, error: balanceError } = await supabase.rpc("get_user_balance", {
       _user_id: user.id,
     });
@@ -130,24 +173,24 @@ const Withdraw = () => {
     }
 
     // Fetch saved wallet address from profile
-    const { data: profile } = await supabase
+    const { data: profileData } = await supabase
       .from("profiles")
       .select("wallet_address")
       .eq("user_id", user.id)
       .maybeSingle();
 
-    if (profile?.wallet_address) {
-      setWalletAddress(profile.wallet_address);
+    if (profileData?.wallet_address) {
+      setWalletAddress(profileData.wallet_address);
     }
   };
 
   const handleSubmitWithdrawal = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!user || !amount || !walletAddress) {
+    if (!user || !amount || !walletAddress || !selectedMethod) {
       toast({
         title: "Missing Information",
-        description: "Please fill in all required fields",
+        description: "Please fill in all required fields and select a payment method",
         variant: "destructive",
       });
       return;
@@ -196,6 +239,8 @@ const Withdraw = () => {
       return;
     }
 
+    const selectedPayment = paymentMethods.find(m => m.id === selectedMethod);
+
     setIsSubmitting(true);
 
     const { error } = await supabase.from("withdrawals").insert({
@@ -203,6 +248,7 @@ const Withdraw = () => {
       amount: btcAmount,
       wallet_address: walletAddress,
       status: "pending",
+      payment_method: selectedPayment?.name || null,
     });
 
     if (error) {
@@ -244,6 +290,42 @@ const Withdraw = () => {
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  const getAddressLabel = () => {
+    const method = paymentMethods.find(m => m.id === selectedMethod);
+    if (!method) return "Wallet Address";
+    
+    switch (method.icon) {
+      case "bitcoin":
+        return "BTC Wallet Address";
+      case "usdt":
+        return "USDT (BEP20) Address";
+      case "paypal":
+        return "PayPal Email";
+      case "bank":
+        return "Bank Account Details";
+      default:
+        return "Wallet Address";
+    }
+  };
+
+  const getAddressPlaceholder = () => {
+    const method = paymentMethods.find(m => m.id === selectedMethod);
+    if (!method) return "Enter your address";
+    
+    switch (method.icon) {
+      case "bitcoin":
+        return "Enter your BTC wallet address";
+      case "usdt":
+        return "Enter your USDT BEP20 address";
+      case "paypal":
+        return "Enter your PayPal email";
+      case "bank":
+        return "Enter bank name, account number, routing number";
+      default:
+        return "Enter your address";
+    }
   };
 
   if (isLoading) {
@@ -337,6 +419,41 @@ const Withdraw = () => {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmitWithdrawal} className="space-y-4">
+                {/* Payment Method Selection */}
+                <div className="space-y-2">
+                  <Label>Payment Method</Label>
+                  {paymentMethods.length > 0 ? (
+                    <RadioGroup value={selectedMethod} onValueChange={setSelectedMethod}>
+                      <div className="grid grid-cols-2 gap-2">
+                        {paymentMethods.map((method) => (
+                          <div
+                            key={method.id}
+                            className={cn(
+                              "flex items-center space-x-2 p-3 rounded-lg border cursor-pointer transition-colors",
+                              selectedMethod === method.id
+                                ? "border-primary bg-primary/5"
+                                : "border-border hover:border-primary/50"
+                            )}
+                            onClick={() => setSelectedMethod(method.id)}
+                          >
+                            <RadioGroupItem value={method.id} id={`w-${method.id}`} />
+                            <div className="flex items-center gap-2">
+                              <div className="text-primary">
+                                {getPaymentIcon(method.icon)}
+                              </div>
+                              <Label htmlFor={`w-${method.id}`} className="text-sm cursor-pointer">
+                                {method.name}
+                              </Label>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </RadioGroup>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No payment methods available</p>
+                  )}
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="amount">Amount ({currency})</Label>
                   <div className="relative">
@@ -364,11 +481,11 @@ const Withdraw = () => {
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="wallet">BTC Wallet Address</Label>
+                  <Label htmlFor="wallet">{getAddressLabel()}</Label>
                   <Input
                     id="wallet"
                     type="text"
-                    placeholder="Enter your BTC wallet address"
+                    placeholder={getAddressPlaceholder()}
                     value={walletAddress}
                     onChange={(e) => setWalletAddress(e.target.value)}
                     required
@@ -377,7 +494,7 @@ const Withdraw = () => {
                 <Button
                   type="submit"
                   className="w-full"
-                  disabled={isSubmitting || !canWithdraw || balance <= 0}
+                  disabled={isSubmitting || !canWithdraw || balance <= 0 || !selectedMethod}
                 >
                   {isSubmitting ? "Submitting..." : "Request Withdrawal"}
                 </Button>
@@ -409,6 +526,11 @@ const Withdraw = () => {
                       <p className="text-sm text-muted-foreground">
                         {formatDate(withdrawal.created_at)}
                       </p>
+                      {withdrawal.payment_method && (
+                        <p className="text-xs text-primary">
+                          via {withdrawal.payment_method}
+                        </p>
+                      )}
                       <p className="text-xs text-muted-foreground font-mono truncate max-w-[200px]">
                         To: {withdrawal.wallet_address}
                       </p>

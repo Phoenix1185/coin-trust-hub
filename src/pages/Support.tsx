@@ -87,6 +87,38 @@ const Support = () => {
     if (user) {
       fetchTickets();
       fetchSiteSettings();
+
+      // Subscribe to real-time ticket and message updates for live chat
+      const ticketChannel = supabase
+        .channel('support-tickets-updates')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'support_tickets',
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => {
+            fetchTickets();
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'support_ticket_messages',
+          },
+          () => {
+            fetchTickets();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(ticketChannel);
+      };
     }
   }, [user]);
 
@@ -98,6 +130,7 @@ const Support = () => {
 
   const fetchSiteSettings = async () => {
     try {
+      // Fetch contact info from site_settings
       const { data: settings } = await supabase
         .from("site_settings")
         .select("setting_key, setting_value");
@@ -107,10 +140,19 @@ const Support = () => {
           if (setting.setting_key === "contact_info") {
             setContactInfo(setting.setting_value as unknown as ContactInfo);
           }
-          if (setting.setting_key === "faq_items") {
-            setFaqItems(setting.setting_value as unknown as FAQItem[]);
-          }
         });
+      }
+
+      // Fetch FAQs from the faqs table (same as admin dashboard)
+      const { data: faqsData } = await supabase
+        .from("faqs")
+        .select("question, answer")
+        .eq("is_active", true)
+        .order("display_order", { ascending: true })
+        .limit(5);
+
+      if (faqsData) {
+        setFaqItems(faqsData);
       }
     } catch (error) {
       console.error("Error fetching site settings:", error);
@@ -529,26 +571,13 @@ const Support = () => {
                     </div>
                   ))
                 ) : (
-                  <>
-                    <div className="p-3 bg-muted/30 rounded-lg">
-                      <div className="font-medium text-sm">How long do withdrawals take?</div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Withdrawals are processed within 24-48 hours after admin approval.
-                      </p>
-                    </div>
-                    <div className="p-3 bg-muted/30 rounded-lg">
-                      <div className="font-medium text-sm">What's the minimum investment?</div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Minimum investment starts at $50 for basic plans.
-                      </p>
-                    </div>
-                    <div className="p-3 bg-muted/30 rounded-lg">
-                      <div className="font-medium text-sm">Is my investment secure?</div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Yes, we use bank-grade security to protect your funds.
-                      </p>
-                    </div>
-                  </>
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No FAQs available. Check our{" "}
+                    <a href="/faq" className="text-primary hover:underline">
+                      FAQ page
+                    </a>{" "}
+                    for more information.
+                  </p>
                 )}
               </CardContent>
             </Card>
