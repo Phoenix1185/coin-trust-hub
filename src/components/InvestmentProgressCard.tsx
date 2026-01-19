@@ -41,6 +41,7 @@ const InvestmentProgressCard = ({ investment, currency }: InvestmentProgressCard
     amount: investment.amount,
     roiPercentage: investment.investment_plans.roi_percentage,
     status: investment.status,
+    startDate: investment.start_date, // Fallback for legacy investments
   });
 
   const getStatusIcon = () => {

@@ -57,7 +57,7 @@ const Wallet = () => {
           .order("created_at", { ascending: false }),
         supabase
           .from("user_investments")
-          .select("id, amount, status, expected_return, created_at")
+          .select("id, amount, status, expected_return, actual_return, created_at")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false }),
       ]);
@@ -71,7 +71,8 @@ const Wallet = () => {
       const totalDeposited = approvedDeposits.reduce((sum, d) => sum + Number(d.amount), 0);
       const totalWithdrawn = approvedWithdrawals.reduce((sum, w) => sum + Number(w.amount), 0);
       const investedAmount = activeInvests.reduce((sum, i) => sum + Number(i.amount), 0);
-      const returnedAmount = completedInvests.reduce((sum, i) => sum + Number(i.expected_return || 0), 0);
+      // Use actual_return for completed investments (from settlement engine), fallback to expected_return
+      const returnedAmount = completedInvests.reduce((sum, i) => sum + Number(i.actual_return || i.expected_return || 0), 0);
 
       const calculatedBalance = totalDeposited - totalWithdrawn - investedAmount + returnedAmount;
       setBalance(Math.max(0, calculatedBalance));

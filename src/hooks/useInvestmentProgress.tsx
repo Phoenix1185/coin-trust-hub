@@ -25,6 +25,7 @@ interface UseInvestmentProgressProps {
   amount: number;
   roiPercentage: number;
   status: string;
+  startDate?: string | null; // Fallback for legacy investments
 }
 
 export const useInvestmentProgress = ({
@@ -37,6 +38,7 @@ export const useInvestmentProgress = ({
   amount,
   roiPercentage,
   status,
+  startDate,
 }: UseInvestmentProgressProps): InvestmentProgressData => {
   const [timeUntilNextSettlement, setTimeUntilNextSettlement] = useState("--:--:--");
   const [timeUntilCompletion, setTimeUntilCompletion] = useState("--:--:--");
@@ -53,18 +55,20 @@ export const useInvestmentProgress = ({
     let activatedDate: Date | null = null;
     let endDate: Date | null = null;
 
-    if (activatedAt) {
-      activatedDate = new Date(activatedAt);
+    // Use activatedAt if available, fallback to startDate for legacy investments
+    const effectiveActivationDate = activatedAt || startDate;
+
+    if (effectiveActivationDate) {
+      activatedDate = new Date(effectiveActivationDate);
       endDate = new Date(activatedDate);
       endDate.setDate(endDate.getDate() + durationDays);
 
-      if (!isComplete && lastSettlementAt) {
-        const lastSettlement = new Date(lastSettlementAt);
+      // Determine last settlement reference
+      const lastSettlementRef = lastSettlementAt || effectiveActivationDate;
+
+      if (!isComplete && lastSettlementRef) {
+        const lastSettlement = new Date(lastSettlementRef);
         nextSettlementTime = new Date(lastSettlement);
-        nextSettlementTime.setHours(nextSettlementTime.getHours() + 24);
-      } else if (!isComplete && !lastSettlementAt) {
-        // First settlement is 24 hours after activation
-        nextSettlementTime = new Date(activatedDate);
         nextSettlementTime.setHours(nextSettlementTime.getHours() + 24);
       }
     }
@@ -81,7 +85,7 @@ export const useInvestmentProgress = ({
       activatedAt: activatedDate,
       endDate,
     };
-  }, [activatedAt, lastSettlementAt, settlementCount, accruedProfit, totalProfit, durationDays, amount, roiPercentage, status]);
+  }, [activatedAt, lastSettlementAt, settlementCount, accruedProfit, totalProfit, durationDays, amount, roiPercentage, status, startDate]);
 
   useEffect(() => {
     const updateCountdowns = () => {
