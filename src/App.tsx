@@ -20,6 +20,8 @@ import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import RiskDisclosure from "./pages/RiskDisclosure";
 
+import CookieConsent from "./components/CookieConsent";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -46,6 +48,7 @@ const App = () => (
             <Route path="/risk-disclosure" element={<RiskDisclosure />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          <CookieConsent />
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>

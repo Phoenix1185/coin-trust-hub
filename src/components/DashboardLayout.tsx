@@ -191,6 +191,27 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         <main className="flex-1 p-4 lg:p-6 overflow-auto">
           {children}
         </main>
+
+        {/* Dashboard Footer */}
+        <footer className="border-t border-border py-4 px-4 lg:px-6 bg-card/30">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
+            <p>© 2024 BitCryptoTradingCo</p>
+            <div className="flex flex-wrap justify-center gap-3">
+              <Link to="/terms-of-service" className="hover:text-primary transition-colors">
+                Terms
+              </Link>
+              <Link to="/privacy-policy" className="hover:text-primary transition-colors">
+                Privacy
+              </Link>
+              <Link to="/risk-disclosure" className="hover:text-primary transition-colors">
+                Risk Disclosure
+              </Link>
+              <Link to="/support" className="hover:text-primary transition-colors">
+                Support
+              </Link>
+            </div>
+          </div>
+        </footer>
       </div>
 
       {/* Mobile Bottom Navigation */}

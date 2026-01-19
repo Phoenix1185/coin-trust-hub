@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import Logo from "@/components/Logo";
 import CryptoChart from "@/components/CryptoChart";
@@ -204,9 +204,22 @@ const Index = () => {
       {/* Footer */}
       <footer className="border-t border-border py-8 relative z-10">
         <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <Logo size="sm" />
-            <p className="text-sm text-muted-foreground">
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <Logo size="sm" />
+              <div className="flex flex-wrap justify-center gap-4 text-sm">
+                <Link to="/terms-of-service" className="text-muted-foreground hover:text-primary transition-colors">
+                  Terms of Service
+                </Link>
+                <Link to="/privacy-policy" className="text-muted-foreground hover:text-primary transition-colors">
+                  Privacy Policy
+                </Link>
+                <Link to="/risk-disclosure" className="text-muted-foreground hover:text-primary transition-colors">
+                  Risk Disclosure
+                </Link>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground text-center">
               © 2024 BitCryptoTradingCo. All rights reserved.
             </p>
           </div>
