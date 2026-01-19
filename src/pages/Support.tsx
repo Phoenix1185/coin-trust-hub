@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -21,8 +21,16 @@ import {
   Phone,
   Globe,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Lock
 } from "lucide-react";
+
+interface TicketMessage {
+  id: string;
+  sender_type: "user" | "admin";
+  message: string;
+  created_at: string;
+}
 
 interface SupportTicket {
   id: string;
@@ -32,6 +40,7 @@ interface SupportTicket {
   response: string | null;
   created_at: string;
   responded_at: string | null;
+  messages?: TicketMessage[];
 }
 
 interface FAQItem {
@@ -54,6 +63,9 @@ const Support = () => {
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [expandedTicket, setExpandedTicket] = useState<string | null>(null);
   const [faqItems, setFaqItems] = useState<FAQItem[]>([]);
+  const [replyMessage, setReplyMessage] = useState<{ [key: string]: string }>({});
+  const [sendingReply, setSendingReply] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const [contactInfo, setContactInfo] = useState<ContactInfo>({
     email: "support@bitcryptotradingco.com",
     phone: "+1 (888) 123-4567",
@@ -77,6 +89,12 @@ const Support = () => {
       fetchSiteSettings();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (expandedTicket) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [expandedTicket, tickets]);
 
   const fetchSiteSettings = async () => {
     try {
@@ -103,14 +121,35 @@ const Support = () => {
     if (!user) return;
 
     try {
-      const { data, error } = await supabase
+      // Fetch tickets
+      const { data: ticketsData, error: ticketsError } = await supabase
         .from("support_tickets")
         .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
-      if (data) {
-        setTickets(data);
+      if (ticketsError) throw ticketsError;
+
+      // Fetch messages for each ticket
+      if (ticketsData) {
+        const ticketsWithMessages = await Promise.all(
+          ticketsData.map(async (ticket) => {
+            const { data: messages } = await supabase
+              .from("support_ticket_messages")
+              .select("*")
+              .eq("ticket_id", ticket.id)
+              .order("created_at", { ascending: true });
+
+            return {
+              ...ticket,
+              messages: (messages || []).map((msg) => ({
+                ...msg,
+                sender_type: msg.sender_type as "user" | "admin",
+              })),
+            };
+          })
+        );
+        setTickets(ticketsWithMessages);
       }
     } catch (error) {
       console.error("Error fetching tickets:", error);
@@ -125,14 +164,29 @@ const Support = () => {
 
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.from("support_tickets").insert({
-        user_id: user.id,
-        subject: newTicket.subject,
-        message: newTicket.message,
-        status: "open",
-      });
+      // Create the ticket
+      const { data: ticketData, error: ticketError } = await supabase
+        .from("support_tickets")
+        .insert({
+          user_id: user.id,
+          subject: newTicket.subject,
+          message: newTicket.message,
+          status: "open",
+        })
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (ticketError) throw ticketError;
+
+      // Add the initial message to the messages table
+      if (ticketData) {
+        await supabase.from("support_ticket_messages").insert({
+          ticket_id: ticketData.id,
+          sender_type: "user",
+          sender_id: user.id,
+          message: newTicket.message,
+        });
+      }
 
       toast({
         title: "Ticket Submitted",
@@ -150,6 +204,34 @@ const Support = () => {
       });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleSendReply = async (ticketId: string) => {
+    if (!user || !replyMessage[ticketId]?.trim()) return;
+
+    setSendingReply(ticketId);
+    try {
+      const { error } = await supabase.from("support_ticket_messages").insert({
+        ticket_id: ticketId,
+        sender_type: "user",
+        sender_id: user.id,
+        message: replyMessage[ticketId],
+      });
+
+      if (error) throw error;
+
+      setReplyMessage({ ...replyMessage, [ticketId]: "" });
+      fetchTickets();
+    } catch (error) {
+      console.error("Error sending reply:", error);
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSendingReply(null);
     }
   };
 
@@ -172,10 +254,13 @@ const Support = () => {
     return new Date(dateString).toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
-      year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  const isTicketOpen = (status: string) => {
+    return !["closed", "resolved"].includes(status);
   };
 
   if (authLoading) {
@@ -230,7 +315,7 @@ const Support = () => {
                       value={newTicket.message}
                       onChange={(e) => setNewTicket({ ...newTicket, message: e.target.value })}
                       placeholder="Provide details about your issue..."
-                      rows={5}
+                      rows={4}
                       required
                     />
                   </div>
@@ -295,27 +380,96 @@ const Support = () => {
                           </div>
                         </button>
                         {expandedTicket === ticket.id && (
-                          <div className="px-3 md:px-4 pb-3 md:pb-4 space-y-4 border-t border-border pt-3 md:pt-4">
-                            <div>
-                              <div className="text-xs md:text-sm font-medium text-muted-foreground mb-2">
-                                Your Message
-                              </div>
-                              <p className="text-sm bg-muted/30 p-3 rounded-lg">{ticket.message}</p>
-                            </div>
-                            {ticket.response && (
-                              <div>
-                                <div className="text-xs md:text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
-                                  <CheckCircle className="w-4 h-4 text-success" />
-                                  Support Response
-                                </div>
-                                <p className="text-sm bg-success/10 border border-success/20 p-3 rounded-lg">
-                                  {ticket.response}
-                                </p>
-                                {ticket.responded_at && (
-                                  <p className="text-xs text-muted-foreground mt-2">
-                                    Responded on {formatDate(ticket.responded_at)}
+                          <div className="border-t border-border">
+                            {/* Chat Messages */}
+                            <div className="max-h-64 overflow-y-auto p-3 md:p-4 space-y-3 bg-muted/20">
+                              {/* Initial message */}
+                              <div className="flex justify-end">
+                                <div className="max-w-[80%] bg-primary/20 border border-primary/30 rounded-lg p-3">
+                                  <p className="text-sm">{ticket.message}</p>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {formatDate(ticket.created_at)}
                                   </p>
-                                )}
+                                </div>
+                              </div>
+                              
+                              {/* Legacy response (if exists) */}
+                              {ticket.response && !ticket.messages?.length && (
+                                <div className="flex justify-start">
+                                  <div className="max-w-[80%] bg-success/10 border border-success/20 rounded-lg p-3">
+                                    <div className="flex items-center gap-1 mb-1">
+                                      <CheckCircle className="w-3 h-3 text-success" />
+                                      <span className="text-xs font-medium text-success">Support</span>
+                                    </div>
+                                    <p className="text-sm">{ticket.response}</p>
+                                    {ticket.responded_at && (
+                                      <p className="text-xs text-muted-foreground mt-1">
+                                        {formatDate(ticket.responded_at)}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Chat messages */}
+                              {ticket.messages?.map((msg) => (
+                                <div
+                                  key={msg.id}
+                                  className={`flex ${msg.sender_type === "user" ? "justify-end" : "justify-start"}`}
+                                >
+                                  <div
+                                    className={`max-w-[80%] rounded-lg p-3 ${
+                                      msg.sender_type === "user"
+                                        ? "bg-primary/20 border border-primary/30"
+                                        : "bg-success/10 border border-success/20"
+                                    }`}
+                                  >
+                                    {msg.sender_type === "admin" && (
+                                      <div className="flex items-center gap-1 mb-1">
+                                        <CheckCircle className="w-3 h-3 text-success" />
+                                        <span className="text-xs font-medium text-success">Support</span>
+                                      </div>
+                                    )}
+                                    <p className="text-sm">{msg.message}</p>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      {formatDate(msg.created_at)}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                              <div ref={messagesEndRef} />
+                            </div>
+                            
+                            {/* Reply Input */}
+                            {isTicketOpen(ticket.status) ? (
+                              <div className="p-3 border-t border-border bg-card">
+                                <div className="flex gap-2">
+                                  <Input
+                                    placeholder="Type your message..."
+                                    value={replyMessage[ticket.id] || ""}
+                                    onChange={(e) =>
+                                      setReplyMessage({ ...replyMessage, [ticket.id]: e.target.value })
+                                    }
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter" && !e.shiftKey) {
+                                        e.preventDefault();
+                                        handleSendReply(ticket.id);
+                                      }
+                                    }}
+                                  />
+                                  <Button
+                                    size="icon"
+                                    onClick={() => handleSendReply(ticket.id)}
+                                    disabled={sendingReply === ticket.id || !replyMessage[ticket.id]?.trim()}
+                                  >
+                                    <Send className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="p-3 border-t border-border bg-muted/30 flex items-center gap-2 justify-center text-muted-foreground">
+                                <Lock className="w-4 h-4" />
+                                <span className="text-sm">This ticket is closed</span>
                               </div>
                             )}
                           </div>

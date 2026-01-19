@@ -2,6 +2,8 @@ import { ReactNode, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import Logo from "@/components/Logo";
+import BTCPriceBanner from "@/components/BTCPriceBanner";
+import MobileBalanceWidget from "@/components/MobileBalanceWidget";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -40,8 +42,10 @@ const adminItems = [
 export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, isAdmin, signOut } = useAuth();
+  const { user, profile, isAdmin, signOut } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const displayName = profile?.full_name || user?.email?.split("@")[0] || "User";
 
   const handleSignOut = async () => {
     await signOut();
@@ -143,6 +147,12 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-h-screen pb-16 lg:pb-0">
+        {/* BTC Price Banner - Desktop */}
+        <BTCPriceBanner className="hidden sm:block" />
+        
+        {/* Mobile Balance Widget */}
+        <MobileBalanceWidget />
+
         {/* Top Header */}
         <header className="h-14 lg:h-16 border-b border-border bg-card/50 backdrop-blur-sm flex items-center justify-between px-4 lg:px-6 sticky top-0 z-30">
           <button
@@ -163,11 +173,11 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
             <div className="hidden sm:flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
                 <span className="text-sm font-medium text-primary">
-                  {user?.email?.[0].toUpperCase() || "U"}
+                  {displayName[0].toUpperCase()}
                 </span>
               </div>
               <span className="text-sm font-medium">
-                {user?.email?.split("@")[0] || "User"}
+                {displayName}
               </span>
             </div>
           </div>
