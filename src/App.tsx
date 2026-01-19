@@ -16,6 +16,9 @@ import Support from "./pages/Support";
 import Notifications from "./pages/Notifications";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
+import TermsOfService from "./pages/TermsOfService";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import RiskDisclosure from "./pages/RiskDisclosure";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +41,9 @@ const App = () => (
             <Route path="/support" element={<Support />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/terms-of-service" element={<TermsOfService />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/risk-disclosure" element={<RiskDisclosure />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
