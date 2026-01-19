@@ -2,9 +2,21 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import DashboardLayout from "@/components/DashboardLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -18,7 +30,9 @@ import {
   TrendingUp,
   Info,
   AlertTriangle,
-  CheckCircle
+  CheckCircle,
+  XCircle,
+  Settings
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -26,9 +40,13 @@ interface Notification {
   id: string;
   title: string;
   message: string;
+  type: string;
+  related_id: string | null;
   is_read: boolean;
   created_at: string;
 }
+
+type FilterType = "all" | "deposit" | "investment" | "withdrawal" | "system";
 
 const Notifications = () => {
   const { user, isLoading: authLoading } = useAuth();
@@ -36,6 +54,7 @@ const Notifications = () => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [filter, setFilter] = useState<FilterType>("all");
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -60,7 +79,7 @@ const Notifications = () => {
         .order("created_at", { ascending: false });
 
       if (data) {
-        setNotifications(data);
+        setNotifications(data as Notification[]);
       }
     } catch (error) {
       console.error("Error fetching notifications:", error);
@@ -120,24 +139,81 @@ const Notifications = () => {
     }
   };
 
-  const getNotificationIcon = (title: string) => {
+  const clearAllNotifications = async () => {
+    if (!user) return;
+
+    try {
+      await supabase
+        .from("notifications")
+        .delete()
+        .eq("user_id", user.id);
+
+      setNotifications([]);
+
+      toast({
+        title: "Cleared",
+        description: "All notifications have been removed.",
+      });
+    } catch (error) {
+      console.error("Error clearing notifications:", error);
+    }
+  };
+
+  const handleNotificationClick = (notification: Notification) => {
+    // Mark as read first
+    if (!notification.is_read) {
+      markAsRead(notification.id);
+    }
+
+    // Navigate based on type
+    switch (notification.type) {
+      case "deposit":
+        navigate("/wallet");
+        break;
+      case "withdrawal":
+        navigate("/wallet");
+        break;
+      case "investment":
+        navigate("/investments");
+        break;
+      case "system":
+        if (notification.title.toLowerCase().includes("frozen")) {
+          navigate("/support");
+        }
+        break;
+      default:
+        break;
+    }
+  };
+
+  const getNotificationIcon = (notification: Notification) => {
+    const { type, title } = notification;
     const lowerTitle = title.toLowerCase();
-    if (lowerTitle.includes("deposit")) {
-      return <ArrowDownCircle className="w-5 h-5 text-success" />;
+
+    // Check for declined/approved status first
+    if (lowerTitle.includes("declined")) {
+      return <XCircle className="w-5 h-5 text-destructive" />;
     }
-    if (lowerTitle.includes("withdrawal")) {
-      return <ArrowUpCircle className="w-5 h-5 text-primary" />;
-    }
-    if (lowerTitle.includes("investment")) {
-      return <TrendingUp className="w-5 h-5 text-primary" />;
-    }
-    if (lowerTitle.includes("approved") || lowerTitle.includes("success")) {
+    if (lowerTitle.includes("approved") || lowerTitle.includes("completed")) {
       return <CheckCircle className="w-5 h-5 text-success" />;
     }
-    if (lowerTitle.includes("warning") || lowerTitle.includes("alert")) {
-      return <AlertTriangle className="w-5 h-5 text-warning" />;
+
+    // Then check by type
+    switch (type) {
+      case "deposit":
+        return <ArrowDownCircle className="w-5 h-5 text-success" />;
+      case "withdrawal":
+        return <ArrowUpCircle className="w-5 h-5 text-primary" />;
+      case "investment":
+        return <TrendingUp className="w-5 h-5 text-primary" />;
+      case "system":
+        if (lowerTitle.includes("frozen")) {
+          return <AlertTriangle className="w-5 h-5 text-warning" />;
+        }
+        return <Settings className="w-5 h-5 text-muted-foreground" />;
+      default:
+        return <Info className="w-5 h-5 text-primary" />;
     }
-    return <Info className="w-5 h-5 text-primary" />;
   };
 
   const formatDate = (dateString: string) => {
@@ -160,7 +236,17 @@ const Notifications = () => {
     });
   };
 
+  const filteredNotifications = notifications.filter((n) => {
+    if (filter === "all") return true;
+    return n.type === filter;
+  });
+
   const unreadCount = notifications.filter((n) => !n.is_read).length;
+
+  const getFilterCount = (filterType: FilterType) => {
+    if (filterType === "all") return notifications.length;
+    return notifications.filter((n) => n.type === filterType).length;
+  };
 
   if (authLoading) {
     return (
@@ -189,13 +275,67 @@ const Notifications = () => {
             </h1>
             <p className="text-muted-foreground">Stay updated with your account activity</p>
           </div>
-          {unreadCount > 0 && (
-            <Button variant="outline" onClick={markAllAsRead} className="shrink-0">
-              <CheckCheck className="w-4 h-4 mr-2" />
-              Mark All Read
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {unreadCount > 0 && (
+              <Button variant="outline" size="sm" onClick={markAllAsRead}>
+                <CheckCheck className="w-4 h-4 mr-2" />
+                Mark All Read
+              </Button>
+            )}
+            {notifications.length > 0 && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Clear All
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Clear all notifications?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently delete all your notifications. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction 
+                      onClick={clearAllNotifications}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Clear All
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
         </div>
+
+        {/* Filters */}
+        <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterType)}>
+          <TabsList className="flex-wrap h-auto gap-1">
+            <TabsTrigger value="all" className="text-xs sm:text-sm">
+              All ({getFilterCount("all")})
+            </TabsTrigger>
+            <TabsTrigger value="deposit" className="text-xs sm:text-sm">
+              <ArrowDownCircle className="w-3 h-3 mr-1" />
+              Deposits ({getFilterCount("deposit")})
+            </TabsTrigger>
+            <TabsTrigger value="investment" className="text-xs sm:text-sm">
+              <TrendingUp className="w-3 h-3 mr-1" />
+              Investments ({getFilterCount("investment")})
+            </TabsTrigger>
+            <TabsTrigger value="withdrawal" className="text-xs sm:text-sm">
+              <ArrowUpCircle className="w-3 h-3 mr-1" />
+              Withdrawals ({getFilterCount("withdrawal")})
+            </TabsTrigger>
+            <TabsTrigger value="system" className="text-xs sm:text-sm">
+              <Settings className="w-3 h-3 mr-1" />
+              System ({getFilterCount("system")})
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
 
         <Card>
           <CardContent className="p-0">
@@ -205,24 +345,31 @@ const Notifications = () => {
                   <Skeleton key={i} className="h-20" />
                 ))}
               </div>
-            ) : notifications.length === 0 ? (
+            ) : filteredNotifications.length === 0 ? (
               <div className="text-center py-16 text-muted-foreground">
                 <BellOff className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                <p className="text-lg font-medium">No notifications yet</p>
-                <p className="text-sm">We'll notify you when something important happens</p>
+                <p className="text-lg font-medium">
+                  {filter === "all" ? "No notifications yet" : `No ${filter} notifications`}
+                </p>
+                <p className="text-sm">
+                  {filter === "all" 
+                    ? "We'll notify you when something important happens" 
+                    : "Try selecting a different filter"}
+                </p>
               </div>
             ) : (
               <div className="divide-y divide-border">
-                {notifications.map((notification) => (
+                {filteredNotifications.map((notification) => (
                   <div
                     key={notification.id}
                     className={cn(
-                      "p-4 flex items-start gap-4 transition-colors hover:bg-muted/30",
-                      !notification.is_read && "bg-primary/5"
+                      "p-4 flex items-start gap-4 transition-colors cursor-pointer",
+                      !notification.is_read ? "bg-primary/5 hover:bg-primary/10" : "hover:bg-muted/30"
                     )}
+                    onClick={() => handleNotificationClick(notification)}
                   >
-                    <div className="p-2 bg-card rounded-lg shrink-0">
-                      {getNotificationIcon(notification.title)}
+                    <div className="p-2 bg-card border border-border rounded-lg shrink-0">
+                      {getNotificationIcon(notification)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
@@ -244,7 +391,7 @@ const Notifications = () => {
                       <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
                         {notification.message}
                       </p>
-                      <div className="flex items-center gap-2 mt-3">
+                      <div className="flex items-center gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
                         {!notification.is_read && (
                           <Button
                             variant="ghost"

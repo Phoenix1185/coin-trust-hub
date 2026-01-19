@@ -173,7 +173,9 @@ export type Database = {
           id: string
           is_read: boolean | null
           message: string
+          related_id: string | null
           title: string
+          type: string | null
           user_id: string
         }
         Insert: {
@@ -181,7 +183,9 @@ export type Database = {
           id?: string
           is_read?: boolean | null
           message: string
+          related_id?: string | null
           title: string
+          type?: string | null
           user_id: string
         }
         Update: {
@@ -189,7 +193,9 @@ export type Database = {
           id?: string
           is_read?: boolean | null
           message?: string
+          related_id?: string | null
           title?: string
+          type?: string | null
           user_id?: string
         }
         Relationships: []
