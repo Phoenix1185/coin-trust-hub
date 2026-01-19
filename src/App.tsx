@@ -21,6 +21,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import RiskDisclosure from "./pages/RiskDisclosure";
 import FAQ from "./pages/FAQ";
 import EmailVerified from "./pages/EmailVerified";
+import ResetPassword from "./pages/ResetPassword";
 import CookieConsent from "./components/CookieConsent";
 
 const queryClient = new QueryClient();
@@ -49,6 +50,7 @@ const App = () => (
             <Route path="/risk-disclosure" element={<RiskDisclosure />} />
             <Route path="/faq" element={<FAQ />} />
             <Route path="/email-verified" element={<EmailVerified />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           <CookieConsent />

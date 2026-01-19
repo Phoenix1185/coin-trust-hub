@@ -46,19 +46,16 @@ const Auth = () => {
     }
   }, [user, isLoading, navigate]);
 
-  // Check for password reset token in URL
+  // Check for password reset token in URL and redirect to reset page
   useEffect(() => {
     const accessToken = searchParams.get("access_token");
     const type = searchParams.get("type");
     
     if (type === "recovery" && accessToken) {
-      // Handle password recovery
-      toast({
-        title: "Password Reset",
-        description: "You can now set a new password in Settings after logging in.",
-      });
+      // Redirect to reset password page
+      navigate("/reset-password");
     }
-  }, [searchParams, toast]);
+  }, [searchParams, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -186,7 +183,7 @@ const Auth = () => {
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
-        redirectTo: `${window.location.origin}/auth?type=recovery`,
+        redirectTo: `${window.location.origin}/reset-password`,
       });
 
       if (error) throw error;
