@@ -32,6 +32,14 @@ const Auth = () => {
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [isResendingEmail, setIsResendingEmail] = useState(false);
   
+  // Countdown timer states
+  const [resendCountdown, setResendCountdown] = useState(0);
+  const [resetCountdown, setResetCountdown] = useState(0);
+  
+  // Rate limiting - store last request time in localStorage
+  const RESEND_COOLDOWN = 60; // 60 seconds between resend requests
+  const RESET_COOLDOWN = 60; // 60 seconds between reset requests
+  
   // Login form state
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -42,6 +50,53 @@ const Auth = () => {
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
   const [signupCurrency, setSignupCurrency] = useState<CurrencyCode>("USD");
+
+  // Initialize countdown timers from localStorage
+  useEffect(() => {
+    const lastResendTime = localStorage.getItem('lastResendVerificationTime');
+    const lastResetTime = localStorage.getItem('lastResetPasswordTime');
+    
+    if (lastResendTime) {
+      const elapsed = Math.floor((Date.now() - parseInt(lastResendTime)) / 1000);
+      const remaining = RESEND_COOLDOWN - elapsed;
+      if (remaining > 0) {
+        setResendCountdown(remaining);
+      }
+    }
+    
+    if (lastResetTime) {
+      const elapsed = Math.floor((Date.now() - parseInt(lastResetTime)) / 1000);
+      const remaining = RESET_COOLDOWN - elapsed;
+      if (remaining > 0) {
+        setResetCountdown(remaining);
+      }
+    }
+  }, []);
+
+  // Countdown timer effect
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (resendCountdown > 0) {
+      interval = setInterval(() => {
+        setResendCountdown(prev => prev - 1);
+      }, 1000);
+    }
+    
+    return () => clearInterval(interval);
+  }, [resendCountdown]);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (resetCountdown > 0) {
+      interval = setInterval(() => {
+        setResetCountdown(prev => prev - 1);
+      }, 1000);
+    }
+    
+    return () => clearInterval(interval);
+  }, [resetCountdown]);
 
   useEffect(() => {
     if (user && !isLoading) {
@@ -169,6 +224,16 @@ const Auth = () => {
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Check rate limiting
+    if (resetCountdown > 0) {
+      toast({
+        title: "Please Wait",
+        description: `You can request another reset link in ${resetCountdown} seconds.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
     try {
       emailSchema.parse(forgotEmail);
     } catch (err) {
@@ -188,6 +253,10 @@ const Auth = () => {
       const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail);
 
       if (error) throw error;
+
+      // Set rate limit
+      localStorage.setItem('lastResetPasswordTime', Date.now().toString());
+      setResetCountdown(RESET_COOLDOWN);
 
       toast({
         title: "Reset Email Sent",
@@ -209,6 +278,16 @@ const Auth = () => {
   const handleResendEmail = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Check rate limiting
+    if (resendCountdown > 0) {
+      toast({
+        title: "Please Wait",
+        description: `You can request another verification email in ${resendCountdown} seconds.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
     try {
       emailSchema.parse(resendEmail);
     } catch (err) {
@@ -228,6 +307,10 @@ const Auth = () => {
       const { error } = await resendVerificationEmail(resendEmail);
 
       if (error) throw error;
+
+      // Set rate limit
+      localStorage.setItem('lastResendVerificationTime', Date.now().toString());
+      setResendCountdown(RESEND_COOLDOWN);
 
       toast({
         title: "Verification Email Sent",
@@ -292,10 +375,16 @@ const Auth = () => {
               <Button
                 type="submit"
                 className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                disabled={isResettingPassword}
+                disabled={isResettingPassword || resetCountdown > 0}
               >
-                {isResettingPassword ? "Sending..." : "Send Reset Link"}
+                {isResettingPassword ? "Sending..." : resetCountdown > 0 ? `Wait ${resetCountdown}s` : "Send Reset Link"}
               </Button>
+              
+              {resetCountdown > 0 && (
+                <p className="text-xs text-center text-muted-foreground mt-2">
+                  You can request another link in {resetCountdown} seconds
+                </p>
+              )}
             </form>
 
             <Button
@@ -350,17 +439,25 @@ const Auth = () => {
               <Button
                 type="submit"
                 className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                disabled={isResendingEmail}
+                disabled={isResendingEmail || resendCountdown > 0}
               >
                 {isResendingEmail ? (
                   <>
                     <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
                     Sending...
                   </>
+                ) : resendCountdown > 0 ? (
+                  `Wait ${resendCountdown}s`
                 ) : (
                   "Resend Verification Email"
                 )}
               </Button>
+              
+              {resendCountdown > 0 && (
+                <p className="text-xs text-center text-muted-foreground mt-2">
+                  You can request another email in {resendCountdown} seconds
+                </p>
+              )}
             </form>
 
             <Button

@@ -34,18 +34,14 @@ const ResetPassword = () => {
       if (session) {
         setIsValidSession(true);
       } else {
-        toast({
-          title: "Invalid or Expired Link",
-          description: "Please request a new password reset link.",
-          variant: "destructive",
-        });
-        setTimeout(() => navigate("/auth"), 2000);
+        // Redirect to expired link page
+        navigate("/link-expired?type=reset");
       }
       setIsLoading(false);
     };
 
     checkSession();
-  }, [navigate, toast]);
+  }, [navigate]);
 
   useEffect(() => {
     // Staggered animation timing
