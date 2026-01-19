@@ -142,19 +142,19 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-h-screen">
+      <div className="flex-1 flex flex-col min-h-screen pb-16 lg:pb-0">
         {/* Top Header */}
-        <header className="h-16 border-b border-border bg-card/50 backdrop-blur-sm flex items-center justify-between px-4 lg:px-6">
+        <header className="h-14 lg:h-16 border-b border-border bg-card/50 backdrop-blur-sm flex items-center justify-between px-4 lg:px-6 sticky top-0 z-30">
           <button
             className="lg:hidden p-2 hover:bg-accent rounded-lg"
             onClick={() => setIsMobileMenuOpen(true)}
           >
-            <Menu className="w-6 h-6" />
+            <Menu className="w-5 h-5" />
           </button>
 
           <div className="flex-1 lg:ml-0" />
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <Link to="/notifications" className="relative p-2 hover:bg-accent rounded-lg">
               <Bell className="w-5 h-5" />
               <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full" />
@@ -178,6 +178,60 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           {children}
         </main>
       </div>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 h-16 bg-card border-t border-border flex items-center justify-around px-2 z-40 lg:hidden safe-area-bottom">
+        <Link
+          to="/dashboard"
+          className={cn(
+            "flex flex-col items-center justify-center gap-1 p-2 rounded-lg min-w-[60px]",
+            location.pathname === "/dashboard" ? "text-primary" : "text-muted-foreground"
+          )}
+        >
+          <LayoutDashboard className="w-5 h-5" />
+          <span className="text-[10px] font-medium">Home</span>
+        </Link>
+        <Link
+          to="/deposit"
+          className={cn(
+            "flex flex-col items-center justify-center gap-1 p-2 rounded-lg min-w-[60px]",
+            location.pathname === "/deposit" ? "text-primary" : "text-muted-foreground"
+          )}
+        >
+          <ArrowDownCircle className="w-5 h-5" />
+          <span className="text-[10px] font-medium">Deposit</span>
+        </Link>
+        <Link
+          to="/investments"
+          className={cn(
+            "flex flex-col items-center justify-center gap-1 p-2 rounded-lg min-w-[60px]",
+            location.pathname === "/investments" ? "text-primary" : "text-muted-foreground"
+          )}
+        >
+          <TrendingUp className="w-5 h-5" />
+          <span className="text-[10px] font-medium">Invest</span>
+        </Link>
+        <Link
+          to="/wallet"
+          className={cn(
+            "flex flex-col items-center justify-center gap-1 p-2 rounded-lg min-w-[60px]",
+            location.pathname === "/wallet" ? "text-primary" : "text-muted-foreground"
+          )}
+        >
+          <Wallet className="w-5 h-5" />
+          <span className="text-[10px] font-medium">Wallet</span>
+        </Link>
+        <Link
+          to="/settings"
+          className={cn(
+            "flex flex-col items-center justify-center gap-1 p-2 rounded-lg min-w-[60px]",
+            location.pathname === "/settings" ? "text-primary" : "text-muted-foreground"
+          )}
+        >
+          <Settings className="w-5 h-5" />
+          <span className="text-[10px] font-medium">Settings</span>
+        </Link>
+      </nav>
     </div>
   );
 };
