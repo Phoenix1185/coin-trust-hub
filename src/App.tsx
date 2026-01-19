@@ -10,6 +10,11 @@ import Dashboard from "./pages/Dashboard";
 import Deposit from "./pages/Deposit";
 import Withdraw from "./pages/Withdraw";
 import Investments from "./pages/Investments";
+import Wallet from "./pages/Wallet";
+import Settings from "./pages/Settings";
+import Support from "./pages/Support";
+import Notifications from "./pages/Notifications";
+import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,10 +33,11 @@ const App = () => (
             <Route path="/deposit" element={<Deposit />} />
             <Route path="/withdraw" element={<Withdraw />} />
             <Route path="/investments" element={<Investments />} />
-            <Route path="/wallet" element={<Dashboard />} />
-            <Route path="/support" element={<Dashboard />} />
-            <Route path="/settings" element={<Dashboard />} />
-            <Route path="/notifications" element={<Dashboard />} />
+            <Route path="/wallet" element={<Wallet />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/support" element={<Support />} />
+            <Route path="/notifications" element={<Notifications />} />
+            <Route path="/admin" element={<Admin />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
