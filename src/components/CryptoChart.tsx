@@ -118,12 +118,30 @@ export const CryptoChart = ({ className, showDetails = true }: CryptoChartProps)
 
   const selectedData = cryptoData.find((c) => c.symbol === selectedCrypto) || cryptoData[0];
   
-  const chartData = selectedData?.sparkline?.map((price, index) => ({
+  // Generate sparkline if not available from API
+  const generateSparklineForPrice = (basePrice: number): number[] => {
+    const data: number[] = [];
+    let price = basePrice * 0.97;
+    for (let i = 0; i < 168; i++) {
+      const trend = Math.sin(i / 24) * basePrice * 0.02;
+      const noise = (Math.random() - 0.48) * basePrice * 0.015;
+      price += trend / 168 + noise;
+      price = Math.max(price, basePrice * 0.92);
+      price = Math.min(price, basePrice * 1.08);
+      data.push(price);
+    }
+    return data;
+  };
+
+  const sparklineData = selectedData?.sparkline?.length 
+    ? selectedData.sparkline 
+    : generateSparklineForPrice(selectedData?.price || 100000);
+  
+  const chartData = sparklineData.map((price, index) => ({
     time: index,
     price,
-    // Add formatted time for tooltip
     label: `${Math.floor(index / 24)}d ${index % 24}h`,
-  })) || [];
+  }));
 
   if (isLoading) {
     return (
@@ -137,8 +155,8 @@ export const CryptoChart = ({ className, showDetails = true }: CryptoChartProps)
   }
 
   const isPositive = selectedData?.change24h >= 0;
-  const minPrice = Math.min(...(selectedData?.sparkline || [0]));
-  const maxPrice = Math.max(...(selectedData?.sparkline || [0]));
+  const minPrice = Math.min(...sparklineData);
+  const maxPrice = Math.max(...sparklineData);
 
   return (
     <div className={cn("bg-card border border-border rounded-xl p-4 md:p-6", className)}>
