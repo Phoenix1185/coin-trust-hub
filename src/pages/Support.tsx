@@ -16,15 +16,13 @@ import {
   MessageSquare, 
   Send, 
   Clock, 
-  CheckCircle, 
-  AlertCircle,
+  CheckCircle,
   Mail,
   Phone,
   Globe,
   ChevronDown,
   ChevronUp
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 interface SupportTicket {
   id: string;
@@ -36,6 +34,17 @@ interface SupportTicket {
   responded_at: string | null;
 }
 
+interface FAQItem {
+  question: string;
+  answer: string;
+}
+
+interface ContactInfo {
+  email: string;
+  phone: string;
+  live_chat: string;
+}
+
 const Support = () => {
   const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -44,6 +53,12 @@ const Support = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [expandedTicket, setExpandedTicket] = useState<string | null>(null);
+  const [faqItems, setFaqItems] = useState<FAQItem[]>([]);
+  const [contactInfo, setContactInfo] = useState<ContactInfo>({
+    email: "support@bitcryptotradingco.com",
+    phone: "+1 (888) 123-4567",
+    live_chat: "Available 24/7",
+  });
 
   const [newTicket, setNewTicket] = useState({
     subject: "",
@@ -59,8 +74,30 @@ const Support = () => {
   useEffect(() => {
     if (user) {
       fetchTickets();
+      fetchSiteSettings();
     }
   }, [user]);
+
+  const fetchSiteSettings = async () => {
+    try {
+      const { data: settings } = await supabase
+        .from("site_settings")
+        .select("setting_key, setting_value");
+
+      if (settings) {
+        settings.forEach((setting) => {
+          if (setting.setting_key === "contact_info") {
+            setContactInfo(setting.setting_value as unknown as ContactInfo);
+          }
+          if (setting.setting_key === "faq_items") {
+            setFaqItems(setting.setting_value as unknown as FAQItem[]);
+          }
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching site settings:", error);
+    }
+  };
 
   const fetchTickets = async () => {
     if (!user) return;
@@ -157,18 +194,18 @@ const Support = () => {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 animate-fade-in">
+      <div className="space-y-4 md:space-y-6 animate-fade-in">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Support Center</h1>
-          <p className="text-muted-foreground">Get help and submit support tickets</p>
+          <h1 className="text-xl md:text-2xl lg:text-3xl font-bold">Support Center</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Get help and submit support tickets</p>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid gap-4 md:gap-6 lg:grid-cols-3">
           {/* New Ticket Form */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-4 md:space-y-6">
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
                   <MessageSquare className="w-5 h-5 text-primary" />
                   Submit a Ticket
                 </CardTitle>
@@ -207,8 +244,8 @@ const Support = () => {
 
             {/* Ticket History */}
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
                   <Clock className="w-5 h-5 text-primary" />
                   Your Tickets
                 </CardTitle>
@@ -238,17 +275,17 @@ const Support = () => {
                           onClick={() =>
                             setExpandedTicket(expandedTicket === ticket.id ? null : ticket.id)
                           }
-                          className="w-full p-4 flex items-center justify-between hover:bg-muted/30 transition-colors"
+                          className="w-full p-3 md:p-4 flex items-center justify-between hover:bg-muted/30 transition-colors"
                         >
-                          <div className="flex items-center gap-4 text-left">
-                            <div>
-                              <div className="font-medium">{ticket.subject}</div>
-                              <div className="text-sm text-muted-foreground">
+                          <div className="flex items-center gap-3 md:gap-4 text-left min-w-0">
+                            <div className="min-w-0">
+                              <div className="font-medium text-sm md:text-base truncate">{ticket.subject}</div>
+                              <div className="text-xs md:text-sm text-muted-foreground">
                                 {formatDate(ticket.created_at)}
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
                             {getStatusBadge(ticket.status)}
                             {expandedTicket === ticket.id ? (
                               <ChevronUp className="w-4 h-4 text-muted-foreground" />
@@ -258,16 +295,16 @@ const Support = () => {
                           </div>
                         </button>
                         {expandedTicket === ticket.id && (
-                          <div className="px-4 pb-4 space-y-4 border-t border-border pt-4">
+                          <div className="px-3 md:px-4 pb-3 md:pb-4 space-y-4 border-t border-border pt-3 md:pt-4">
                             <div>
-                              <div className="text-sm font-medium text-muted-foreground mb-2">
+                              <div className="text-xs md:text-sm font-medium text-muted-foreground mb-2">
                                 Your Message
                               </div>
                               <p className="text-sm bg-muted/30 p-3 rounded-lg">{ticket.message}</p>
                             </div>
                             {ticket.response && (
                               <div>
-                                <div className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                                <div className="text-xs md:text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
                                   <CheckCircle className="w-4 h-4 text-success" />
                                   Support Response
                                 </div>
@@ -292,62 +329,73 @@ const Support = () => {
           </div>
 
           {/* Contact Info */}
-          <div className="space-y-6">
+          <div className="space-y-4 md:space-y-6">
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
                   <HelpCircle className="w-5 h-5 text-primary" />
                   Contact Us
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-3 md:space-y-4">
                 <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
-                  <Mail className="w-5 h-5 text-primary" />
-                  <div>
+                  <Mail className="w-5 h-5 text-primary flex-shrink-0" />
+                  <div className="min-w-0">
                     <div className="text-sm font-medium">Email</div>
-                    <div className="text-sm text-muted-foreground">support@bitcryptotradingco.com</div>
+                    <div className="text-xs md:text-sm text-muted-foreground truncate">{contactInfo.email}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
-                  <Phone className="w-5 h-5 text-primary" />
-                  <div>
+                  <Phone className="w-5 h-5 text-primary flex-shrink-0" />
+                  <div className="min-w-0">
                     <div className="text-sm font-medium">Phone</div>
-                    <div className="text-sm text-muted-foreground">+1 (888) 123-4567</div>
+                    <div className="text-xs md:text-sm text-muted-foreground">{contactInfo.phone}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
-                  <Globe className="w-5 h-5 text-primary" />
-                  <div>
+                  <Globe className="w-5 h-5 text-primary flex-shrink-0" />
+                  <div className="min-w-0">
                     <div className="text-sm font-medium">Live Chat</div>
-                    <div className="text-sm text-muted-foreground">Available 24/7</div>
+                    <div className="text-xs md:text-sm text-muted-foreground">{contactInfo.live_chat}</div>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader>
-                <CardTitle>FAQ</CardTitle>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg md:text-xl">FAQ</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="p-3 bg-muted/30 rounded-lg">
-                  <div className="font-medium text-sm">How long do withdrawals take?</div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Withdrawals are processed within 24-48 hours after admin approval.
-                  </p>
-                </div>
-                <div className="p-3 bg-muted/30 rounded-lg">
-                  <div className="font-medium text-sm">What's the minimum investment?</div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Minimum investment starts at $100 for basic plans.
-                  </p>
-                </div>
-                <div className="p-3 bg-muted/30 rounded-lg">
-                  <div className="font-medium text-sm">Is my investment secure?</div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Yes, we use bank-grade security to protect your funds.
-                  </p>
-                </div>
+                {faqItems.length > 0 ? (
+                  faqItems.map((faq, index) => (
+                    <div key={index} className="p-3 bg-muted/30 rounded-lg">
+                      <div className="font-medium text-sm">{faq.question}</div>
+                      <p className="text-xs text-muted-foreground mt-1">{faq.answer}</p>
+                    </div>
+                  ))
+                ) : (
+                  <>
+                    <div className="p-3 bg-muted/30 rounded-lg">
+                      <div className="font-medium text-sm">How long do withdrawals take?</div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Withdrawals are processed within 24-48 hours after admin approval.
+                      </p>
+                    </div>
+                    <div className="p-3 bg-muted/30 rounded-lg">
+                      <div className="font-medium text-sm">What's the minimum investment?</div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Minimum investment starts at $100 for basic plans.
+                      </p>
+                    </div>
+                    <div className="p-3 bg-muted/30 rounded-lg">
+                      <div className="font-medium text-sm">Is my investment secure?</div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Yes, we use bank-grade security to protect your funds.
+                      </p>
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           </div>
