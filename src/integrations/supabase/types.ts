@@ -242,6 +242,7 @@ export type Database = {
           id: string
           is_frozen: boolean | null
           phone: string | null
+          preferred_currency: string | null
           updated_at: string
           user_id: string
           wallet_address: string | null
@@ -254,6 +255,7 @@ export type Database = {
           id?: string
           is_frozen?: boolean | null
           phone?: string | null
+          preferred_currency?: string | null
           updated_at?: string
           user_id: string
           wallet_address?: string | null
@@ -266,6 +268,7 @@ export type Database = {
           id?: string
           is_frozen?: boolean | null
           phone?: string | null
+          preferred_currency?: string | null
           updated_at?: string
           user_id?: string
           wallet_address?: string | null

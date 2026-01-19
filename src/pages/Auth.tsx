@@ -1,14 +1,15 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, type CurrencyCode } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import Logo from "@/components/Logo";
-import { Eye, EyeOff, Mail, Lock, User, ArrowLeft } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, Home } from "lucide-react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -37,6 +38,7 @@ const Auth = () => {
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
+  const [signupCurrency, setSignupCurrency] = useState<CurrencyCode>("USD");
 
   useEffect(() => {
     if (user && !isLoading) {
@@ -127,7 +129,7 @@ const Auth = () => {
     
     setIsSubmitting(true);
     
-    const { error } = await signUp(signupEmail, signupPassword, signupName);
+    const { error } = await signUp(signupEmail, signupPassword, signupName, signupCurrency);
     
     if (error) {
       const errorMessage = error.message.includes("already registered")
@@ -274,6 +276,15 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      {/* Back to Home Button */}
+      <Link 
+        to="/" 
+        className="absolute top-4 left-4 z-20 flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <Home className="w-5 h-5" />
+        <span className="text-sm font-medium">Back to Home</span>
+      </Link>
+
       {/* Background decorations */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
@@ -423,6 +434,22 @@ const Auth = () => {
                       required
                     />
                   </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-currency">Preferred Currency</Label>
+                  <Select value={signupCurrency} onValueChange={(val) => setSignupCurrency(val as CurrencyCode)}>
+                    <SelectTrigger id="signup-currency">
+                      <SelectValue placeholder="Select currency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="USD">$ US Dollar (USD)</SelectItem>
+                      <SelectItem value="EUR">€ Euro (EUR)</SelectItem>
+                      <SelectItem value="GBP">£ British Pound (GBP)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    This will be your primary display currency
+                  </p>
                 </div>
                 <Button
                   type="submit"

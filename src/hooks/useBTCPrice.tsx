@@ -7,9 +7,34 @@ interface CryptoData {
   change24h: number;
 }
 
+interface ExchangeRates {
+  USD: number;
+  EUR: number;
+  GBP: number;
+}
+
+type CurrencyCode = "USD" | "EUR" | "GBP";
+
+const CURRENCY_SYMBOLS: Record<CurrencyCode, string> = {
+  USD: "$",
+  EUR: "€",
+  GBP: "£",
+};
+
+const CURRENCY_LOCALES: Record<CurrencyCode, string> = {
+  USD: "en-US",
+  EUR: "de-DE",
+  GBP: "en-GB",
+};
+
 export const useBTCPrice = () => {
   const [btcPrice, setBtcPrice] = useState<number>(104250); // Default fallback
   const [ethPrice, setEthPrice] = useState<number>(3320);
+  const [exchangeRates, setExchangeRates] = useState<ExchangeRates>({
+    USD: 1,
+    EUR: 0.92,
+    GBP: 0.79,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
@@ -41,11 +66,33 @@ export const useBTCPrice = () => {
     }
   }, []);
 
+  const fetchExchangeRates = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke("exchange-rates", {
+        body: {},
+      });
+
+      if (!error && data?.rates) {
+        setExchangeRates(data.rates);
+        console.log("Exchange rates updated:", data.rates);
+      }
+    } catch (err) {
+      console.error("Error fetching exchange rates:", err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchPrices();
-    const interval = setInterval(fetchPrices, 60000); // Refresh every minute
-    return () => clearInterval(interval);
-  }, [fetchPrices]);
+    fetchExchangeRates();
+    
+    const priceInterval = setInterval(fetchPrices, 60000); // Refresh every minute
+    const ratesInterval = setInterval(fetchExchangeRates, 1800000); // Refresh every 30 min
+    
+    return () => {
+      clearInterval(priceInterval);
+      clearInterval(ratesInterval);
+    };
+  }, [fetchPrices, fetchExchangeRates]);
 
   // Format BTC amount with 4-8 decimal places depending on size
   const formatBTC = useCallback((btcAmount: number) => {
@@ -85,9 +132,48 @@ export const useBTCPrice = () => {
     }).format(usdAmount);
   }, []);
 
+  // Convert USD to another currency
+  const convertFromUSD = useCallback((usdAmount: number, currency: CurrencyCode): number => {
+    return usdAmount * exchangeRates[currency];
+  }, [exchangeRates]);
+
+  // Format a fiat amount in a specific currency
+  const formatFiatAmount = useCallback((usdAmount: number, currency: CurrencyCode = "USD"): string => {
+    const convertedAmount = convertFromUSD(usdAmount, currency);
+    const symbol = CURRENCY_SYMBOLS[currency];
+    const locale = CURRENCY_LOCALES[currency];
+    
+    return new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency: currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(convertedAmount);
+  }, [convertFromUSD]);
+
+  // Format BTC as user's preferred currency with BTC shown below
+  const formatCurrency = useCallback((btcAmount: number, currency: CurrencyCode = "USD"): string => {
+    const usdValue = btcAmount * btcPrice;
+    return formatFiatAmount(usdValue, currency);
+  }, [btcPrice, formatFiatAmount]);
+
+  // Format display with both fiat and BTC
+  const formatWithBTC = useCallback((btcAmount: number, currency: CurrencyCode = "USD"): { fiat: string; btc: string } => {
+    return {
+      fiat: formatCurrency(btcAmount, currency),
+      btc: formatBTC(btcAmount),
+    };
+  }, [formatCurrency, formatBTC]);
+
+  // Get currency symbol
+  const getCurrencySymbol = useCallback((currency: CurrencyCode): string => {
+    return CURRENCY_SYMBOLS[currency];
+  }, []);
+
   return {
     btcPrice,
     ethPrice,
+    exchangeRates,
     isLoading,
     lastUpdated,
     formatBTC,
@@ -95,8 +181,15 @@ export const useBTCPrice = () => {
     formatRawUSD,
     btcToUSD,
     usdToBTC,
+    formatFiatAmount,
+    formatCurrency,
+    formatWithBTC,
+    convertFromUSD,
+    getCurrencySymbol,
     refreshPrices: fetchPrices,
+    refreshExchangeRates: fetchExchangeRates,
   };
 };
 
+export type { CurrencyCode };
 export default useBTCPrice;
