@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useBTCPrice } from "@/hooks/useBTCPrice";
@@ -7,9 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { CheckCircle, Clock, XCircle, AlertTriangle, ArrowUpCircle, Wallet, CreditCard, Landmark, Bitcoin } from "lucide-react";
+import { CheckCircle, Clock, XCircle, AlertTriangle, ArrowUpCircle, Wallet, CreditCard, Landmark, Bitcoin, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
@@ -19,6 +20,12 @@ interface PaymentMethod {
   type: string;
   icon: string;
   description: string | null;
+}
+
+interface UserPaymentDetail {
+  id: string;
+  payment_method_id: string;
+  details: Record<string, string>;
 }
 
 interface Withdrawal {
@@ -52,24 +59,47 @@ const getPaymentIcon = (icon: string) => {
   }
 };
 
+const getPaymentDetailFields = (icon: string): { key: string; label: string; placeholder: string; type?: string }[] => {
+  switch (icon) {
+    case "bitcoin":
+      return [{ key: "wallet_address", label: "BTC Wallet Address", placeholder: "Enter your BTC wallet address" }];
+    case "usdt":
+      return [{ key: "wallet_address", label: "USDT (BEP20) Address", placeholder: "Enter your USDT BEP20 address" }];
+    case "paypal":
+      return [{ key: "email", label: "PayPal Email", placeholder: "Enter your PayPal email", type: "email" }];
+    case "bank":
+      return [
+        { key: "bank_name", label: "Bank Name", placeholder: "Enter your bank name" },
+        { key: "account_name", label: "Account Name", placeholder: "Enter account holder name" },
+        { key: "account_number", label: "Account Number", placeholder: "Enter your account number" },
+        { key: "routing_number", label: "Routing/Sort Code", placeholder: "Enter routing or sort code" },
+        { key: "swift_code", label: "SWIFT Code (Optional)", placeholder: "For international transfers" },
+      ];
+    default:
+      return [{ key: "wallet_address", label: "Wallet Address", placeholder: "Enter your address" }];
+  }
+};
+
 const Withdraw = () => {
   const { user, profile, isLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { formatBTC, btcPrice, btcToUSD, usdToBTC, formatFiatAmount, getCurrencySymbol, convertFromUSD
-  } = useBTCPrice();
+  const { formatBTC, btcToUSD, usdToBTC, formatFiatAmount, getCurrencySymbol } = useBTCPrice();
   const currency = profile?.preferred_currency || "USD";
   
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [userPaymentDetails, setUserPaymentDetails] = useState<UserPaymentDetail[]>([]);
   const [selectedMethod, setSelectedMethod] = useState<string>("");
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [settings, setSettings] = useState<WithdrawalSettings | null>(null);
   const [balance, setBalance] = useState(0);
   const [amount, setAmount] = useState("");
-  const [walletAddress, setWalletAddress] = useState("");
+  const [paymentDetails, setPaymentDetails] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSavingDetails, setIsSavingDetails] = useState(false);
   const [canWithdraw, setCanWithdraw] = useState(false);
   const [daysInvested, setDaysInvested] = useState(0);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -77,85 +107,77 @@ const Withdraw = () => {
     }
   }, [user, isLoading, navigate]);
 
-  useEffect(() => {
-    if (user) {
-      fetchData();
-      fetchPaymentMethods();
-    }
-  }, [user]);
-
-  const fetchPaymentMethods = async () => {
+  // Fetch payment methods once
+  const fetchPaymentMethods = useCallback(async () => {
     const { data, error } = await supabase
       .from("payment_methods")
-      .select("*")
+      .select("id, name, type, icon, description")
       .in("type", ["withdrawal", "both"])
       .eq("is_active", true)
       .order("display_order", { ascending: true });
 
     if (!error && data) {
       setPaymentMethods(data);
-      if (data.length > 0) {
+      if (data.length > 0 && !selectedMethod) {
         setSelectedMethod(data[0].id);
       }
     }
-  };
+  }, [selectedMethod]);
 
-  const fetchData = async () => {
+  // Fetch user's saved payment details
+  const fetchUserPaymentDetails = useCallback(async () => {
+    if (!user) return;
+    
+    const { data, error } = await supabase
+      .from("user_payment_details")
+      .select("id, payment_method_id, details")
+      .eq("user_id", user.id);
+
+    if (!error && data) {
+      setUserPaymentDetails(data.map(d => ({
+        ...d,
+        details: (d.details || {}) as Record<string, string>
+      })));
+    }
+  }, [user]);
+
+  const fetchData = useCallback(async () => {
     if (!user) return;
 
-    // Fetch withdrawal settings
-    const { data: settingsData } = await supabase
-      .from("withdrawal_settings")
-      .select("*")
-      .limit(1)
-      .maybeSingle();
+    const [settingsRes, withdrawalsRes, balanceRes, investmentsRes] = await Promise.all([
+      supabase.from("withdrawal_settings").select("*").limit(1).maybeSingle(),
+      supabase.from("withdrawals").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+      supabase.rpc("get_user_balance", { _user_id: user.id }),
+      supabase.from("user_investments").select("created_at").eq("user_id", user.id).eq("status", "active").order("created_at", { ascending: true }).limit(1),
+    ]);
 
-    if (settingsData) {
+    if (settingsRes.data) {
       setSettings({
-        min_investment_days: settingsData.min_investment_days ?? 7,
-        min_withdrawal_amount: Number(settingsData.min_withdrawal_amount ?? 0.001),
+        min_investment_days: settingsRes.data.min_investment_days ?? 7,
+        min_withdrawal_amount: Number(settingsRes.data.min_withdrawal_amount ?? 0.001),
       });
     }
 
-    // Fetch withdrawals
-    const { data: withdrawalsData } = await supabase
-      .from("withdrawals")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
-
-    if (withdrawalsData) {
-      setWithdrawals(withdrawalsData.map(w => ({
+    if (withdrawalsRes.data) {
+      setWithdrawals(withdrawalsRes.data.map(w => ({
         ...w,
         amount: Number(w.amount),
       })));
     }
 
-    // Use the database function for accurate balance calculation
-    const { data: balanceData, error: balanceError } = await supabase.rpc("get_user_balance", {
-      _user_id: user.id,
-    });
-
-    if (!balanceError && balanceData !== null) {
-      setBalance(Math.max(0, Number(balanceData)));
+    if (balanceRes.data !== null) {
+      setBalance(Math.max(0, Number(balanceRes.data)));
     }
 
-    // Check investment duration
-    const { data: investments } = await supabase
-      .from("user_investments")
-      .select("created_at")
-      .eq("user_id", user.id)
-      .eq("status", "active")
-      .order("created_at", { ascending: true })
-      .limit(1);
+    let minDays = settingsRes.data?.min_investment_days ?? 7;
 
-    if (investments && investments.length > 0) {
-      const firstInvestment = new Date(investments[0].created_at);
+    if (investmentsRes.data && investmentsRes.data.length > 0) {
+      const firstInvestment = new Date(investmentsRes.data[0].created_at);
       const daysSince = Math.floor((Date.now() - firstInvestment.getTime()) / (1000 * 60 * 60 * 24));
       setDaysInvested(daysSince);
-      setCanWithdraw(daysSince >= (settingsData?.min_investment_days ?? 7));
+      setCanWithdraw(daysSince >= minDays);
     } else {
-      // If no active investments, check approved deposits
+      // Check approved deposits if no active investments
       const { data: firstDeposit } = await supabase
         .from("deposits")
         .select("created_at")
@@ -168,29 +190,103 @@ const Withdraw = () => {
         const depositDate = new Date(firstDeposit[0].created_at);
         const daysSince = Math.floor((Date.now() - depositDate.getTime()) / (1000 * 60 * 60 * 24));
         setDaysInvested(daysSince);
-        setCanWithdraw(daysSince >= (settingsData?.min_investment_days ?? 7));
+        setCanWithdraw(daysSince >= minDays);
       }
     }
 
-    // Fetch saved wallet address from profile
-    const { data: profileData } = await supabase
-      .from("profiles")
-      .select("wallet_address")
-      .eq("user_id", user.id)
-      .maybeSingle();
+    setDataLoaded(true);
+  }, [user]);
 
-    if (profileData?.wallet_address) {
-      setWalletAddress(profileData.wallet_address);
+  useEffect(() => {
+    if (user && !dataLoaded) {
+      Promise.all([fetchPaymentMethods(), fetchUserPaymentDetails(), fetchData()]);
     }
+  }, [user, dataLoaded, fetchPaymentMethods, fetchUserPaymentDetails, fetchData]);
+
+  // Load saved details when method changes
+  useEffect(() => {
+    if (selectedMethod && userPaymentDetails.length > 0) {
+      const saved = userPaymentDetails.find(d => d.payment_method_id === selectedMethod);
+      if (saved) {
+        setPaymentDetails(saved.details);
+      } else {
+        setPaymentDetails({});
+      }
+    } else {
+      setPaymentDetails({});
+    }
+  }, [selectedMethod, userPaymentDetails]);
+
+  const selectedPaymentMethod = useMemo(() => 
+    paymentMethods.find(m => m.id === selectedMethod),
+    [paymentMethods, selectedMethod]
+  );
+
+  const detailFields = useMemo(() => 
+    selectedPaymentMethod ? getPaymentDetailFields(selectedPaymentMethod.icon) : [],
+    [selectedPaymentMethod]
+  );
+
+  const handleSavePaymentDetails = async () => {
+    if (!user || !selectedMethod) return;
+
+    setIsSavingDetails(true);
+
+    const existingDetail = userPaymentDetails.find(d => d.payment_method_id === selectedMethod);
+
+    if (existingDetail) {
+      const { error } = await supabase
+        .from("user_payment_details")
+        .update({ details: paymentDetails })
+        .eq("id", existingDetail.id);
+
+      if (error) {
+        toast({ title: "Error", description: "Failed to save payment details", variant: "destructive" });
+      } else {
+        toast({ title: "Saved", description: "Payment details updated successfully" });
+        await fetchUserPaymentDetails();
+      }
+    } else {
+      const { error } = await supabase
+        .from("user_payment_details")
+        .insert({
+          user_id: user.id,
+          payment_method_id: selectedMethod,
+          details: paymentDetails,
+        });
+
+      if (error) {
+        toast({ title: "Error", description: "Failed to save payment details", variant: "destructive" });
+      } else {
+        toast({ title: "Saved", description: "Payment details saved successfully" });
+        await fetchUserPaymentDetails();
+      }
+    }
+
+    setIsSavingDetails(false);
   };
 
   const handleSubmitWithdrawal = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!user || !amount || !walletAddress || !selectedMethod) {
+    if (!user || !amount || !selectedMethod) {
       toast({
         title: "Missing Information",
         description: "Please fill in all required fields and select a payment method",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if payment details are filled
+    const hasRequiredDetails = detailFields.every(field => 
+      !field.key.includes("Optional") ? paymentDetails[field.key]?.trim() : true
+    );
+
+    if (!hasRequiredDetails) {
+      toast({
+        title: "Missing Payment Details",
+        description: "Please fill in your payment details and save them first",
         variant: "destructive",
       });
       return;
@@ -239,7 +335,10 @@ const Withdraw = () => {
       return;
     }
 
-    const selectedPayment = paymentMethods.find(m => m.id === selectedMethod);
+    // Format wallet address from payment details
+    const walletAddress = Object.entries(paymentDetails)
+      .map(([key, value]) => `${key}: ${value}`)
+      .join(" | ");
 
     setIsSubmitting(true);
 
@@ -248,7 +347,7 @@ const Withdraw = () => {
       amount: btcAmount,
       wallet_address: walletAddress,
       status: "pending",
-      payment_method: selectedPayment?.name || null,
+      payment_method: selectedPaymentMethod?.name || null,
     });
 
     if (error) {
@@ -263,7 +362,7 @@ const Withdraw = () => {
         description: "Your withdrawal is pending admin approval.",
       });
       setAmount("");
-      fetchData();
+      setDataLoaded(false);
     }
 
     setIsSubmitting(false);
@@ -290,42 +389,6 @@ const Withdraw = () => {
       hour: "2-digit",
       minute: "2-digit",
     });
-  };
-
-  const getAddressLabel = () => {
-    const method = paymentMethods.find(m => m.id === selectedMethod);
-    if (!method) return "Wallet Address";
-    
-    switch (method.icon) {
-      case "bitcoin":
-        return "BTC Wallet Address";
-      case "usdt":
-        return "USDT (BEP20) Address";
-      case "paypal":
-        return "PayPal Email";
-      case "bank":
-        return "Bank Account Details";
-      default:
-        return "Wallet Address";
-    }
-  };
-
-  const getAddressPlaceholder = () => {
-    const method = paymentMethods.find(m => m.id === selectedMethod);
-    if (!method) return "Enter your address";
-    
-    switch (method.icon) {
-      case "bitcoin":
-        return "Enter your BTC wallet address";
-      case "usdt":
-        return "Enter your USDT BEP20 address";
-      case "paypal":
-        return "Enter your PayPal email";
-      case "bank":
-        return "Enter bank name, account number, routing number";
-      default:
-        return "Enter your address";
-    }
   };
 
   if (isLoading) {
@@ -454,6 +517,56 @@ const Withdraw = () => {
                   )}
                 </div>
 
+                {/* Dynamic Payment Details Fields */}
+                {selectedPaymentMethod && (
+                  <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
+                    <Label className="text-base font-medium">
+                      {selectedPaymentMethod.name} Details
+                    </Label>
+                    {detailFields.map((field) => (
+                      <div key={field.key} className="space-y-1">
+                        <Label htmlFor={field.key} className="text-sm">
+                          {field.label}
+                        </Label>
+                        {field.key === "bank_name" || field.key.includes("address") ? (
+                          <Input
+                            id={field.key}
+                            type={field.type || "text"}
+                            placeholder={field.placeholder}
+                            value={paymentDetails[field.key] || ""}
+                            onChange={(e) => setPaymentDetails(prev => ({
+                              ...prev,
+                              [field.key]: e.target.value
+                            }))}
+                          />
+                        ) : (
+                          <Input
+                            id={field.key}
+                            type={field.type || "text"}
+                            placeholder={field.placeholder}
+                            value={paymentDetails[field.key] || ""}
+                            onChange={(e) => setPaymentDetails(prev => ({
+                              ...prev,
+                              [field.key]: e.target.value
+                            }))}
+                          />
+                        )}
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSavePaymentDetails}
+                      disabled={isSavingDetails}
+                      className="mt-2"
+                    >
+                      <Save className="w-4 h-4 mr-2" />
+                      {isSavingDetails ? "Saving..." : "Save Details"}
+                    </Button>
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label htmlFor="amount">Amount ({currency})</Label>
                   <div className="relative">
@@ -480,17 +593,7 @@ const Withdraw = () => {
                     </p>
                   )}
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="wallet">{getAddressLabel()}</Label>
-                  <Input
-                    id="wallet"
-                    type="text"
-                    placeholder={getAddressPlaceholder()}
-                    value={walletAddress}
-                    onChange={(e) => setWalletAddress(e.target.value)}
-                    required
-                  />
-                </div>
+
                 <Button
                   type="submit"
                   className="w-full"
@@ -507,56 +610,53 @@ const Withdraw = () => {
         <Card>
           <CardHeader>
             <CardTitle>Withdrawal History</CardTitle>
+            <CardDescription>Your past withdrawal requests</CardDescription>
           </CardHeader>
           <CardContent>
             {withdrawals.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">
+              <p className="text-center py-8 text-muted-foreground">
                 No withdrawals yet
               </p>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {withdrawals.map((withdrawal) => (
                   <div
                     key={withdrawal.id}
-                    className="flex items-center justify-between p-4 bg-muted/50 rounded-lg"
+                    className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-muted/30 rounded-lg gap-3"
                   >
-                    <div>
-                      <p className="font-medium">{formatFiatAmount(btcToUSD(withdrawal.amount), currency)}</p>
-                      <p className="text-xs text-muted-foreground">{formatBTC(withdrawal.amount)}</p>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        {getStatusIcon(withdrawal.status)}
+                        <span className="font-medium capitalize">
+                          {withdrawal.status}
+                        </span>
+                        {withdrawal.payment_method && (
+                          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                            {withdrawal.payment_method}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-sm text-muted-foreground">
                         {formatDate(withdrawal.created_at)}
                       </p>
-                      {withdrawal.payment_method && (
-                        <p className="text-xs text-primary">
-                          via {withdrawal.payment_method}
-                        </p>
-                      )}
-                      <p className="text-xs text-muted-foreground font-mono truncate max-w-[200px]">
-                        To: {withdrawal.wallet_address}
-                      </p>
-                      {withdrawal.admin_txid && (
-                        <p className="text-xs text-success font-mono truncate max-w-[200px]">
-                          TXID: {withdrawal.admin_txid}
-                        </p>
-                      )}
                       {withdrawal.decline_reason && (
-                        <p className="text-xs text-destructive">
+                        <p className="text-sm text-destructive">
                           Reason: {withdrawal.decline_reason}
                         </p>
                       )}
+                      {withdrawal.admin_txid && (
+                        <p className="text-xs text-muted-foreground font-mono break-all">
+                          TXID: {withdrawal.admin_txid}
+                        </p>
+                      )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      {getStatusIcon(withdrawal.status)}
-                      <span
-                        className={cn(
-                          "text-sm capitalize",
-                          withdrawal.status === "approved" && "text-success",
-                          withdrawal.status === "pending" && "text-warning",
-                          withdrawal.status === "declined" && "text-destructive"
-                        )}
-                      >
-                        {withdrawal.status}
-                      </span>
+                    <div className="text-right">
+                      <p className="font-semibold text-primary">
+                        {formatFiatAmount(btcToUSD(withdrawal.amount), currency)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatBTC(withdrawal.amount)}
+                      </p>
                     </div>
                   </div>
                 ))}
