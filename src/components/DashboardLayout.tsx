@@ -5,6 +5,7 @@ import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
 import Logo from "@/components/Logo";
 import BTCPriceBanner from "@/components/BTCPriceBanner";
 import MobileBalanceWidget from "@/components/MobileBalanceWidget";
+import NotificationDropdown from "@/components/NotificationDropdown";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -13,7 +14,6 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   TrendingUp,
-  Bell,
   Settings,
   LogOut,
   Menu,
@@ -169,10 +169,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           <div className="flex-1 lg:ml-0" />
 
           <div className="flex items-center gap-3">
-            <Link to="/notifications" className="relative p-2 hover:bg-accent rounded-lg">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full" />
-            </Link>
+            <NotificationDropdown />
             
             <div className="hidden sm:flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
