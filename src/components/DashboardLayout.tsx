@@ -1,6 +1,7 @@
 import { ReactNode, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
 import Logo from "@/components/Logo";
 import BTCPriceBanner from "@/components/BTCPriceBanner";
 import MobileBalanceWidget from "@/components/MobileBalanceWidget";
@@ -44,6 +45,9 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const navigate = useNavigate();
   const { user, profile, isAdmin, signOut } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Enable real-time notifications for the logged-in user
+  useRealtimeNotifications();
 
   const displayName = profile?.full_name || user?.email?.split("@")[0] || "User";
 
