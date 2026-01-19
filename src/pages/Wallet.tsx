@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useBTCPrice } from "@/hooks/useBTCPrice";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ interface Transaction {
 const Wallet = () => {
   const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const { btcPrice, formatBTC, formatUSD, isLoading: priceLoading } = useBTCPrice();
   const [balance, setBalance] = useState<number>(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -40,38 +42,43 @@ const Wallet = () => {
     if (!user) return;
     
     try {
-      // Fetch balance
-      const { data: balanceData } = await supabase.rpc("get_user_balance", {
-        _user_id: user.id,
-      });
-      setBalance(balanceData || 0);
-
-      // Fetch recent transactions
+      // Fetch balance using the same calculation as Dashboard
       const [deposits, withdrawals, investments] = await Promise.all([
         supabase
           .from("deposits")
           .select("id, amount, status, created_at")
           .eq("user_id", user.id)
-          .order("created_at", { ascending: false })
-          .limit(5),
+          .order("created_at", { ascending: false }),
         supabase
           .from("withdrawals")
           .select("id, amount, status, created_at")
           .eq("user_id", user.id)
-          .order("created_at", { ascending: false })
-          .limit(5),
+          .order("created_at", { ascending: false }),
         supabase
           .from("user_investments")
-          .select("id, amount, status, created_at")
+          .select("id, amount, status, expected_return, created_at")
           .eq("user_id", user.id)
-          .order("created_at", { ascending: false })
-          .limit(5),
+          .order("created_at", { ascending: false }),
       ]);
+
+      // Calculate balance (same logic as Dashboard)
+      const approvedDeposits = deposits.data?.filter(d => d.status === "approved") || [];
+      const approvedWithdrawals = withdrawals.data?.filter(w => w.status === "approved") || [];
+      const activeInvests = investments.data?.filter(i => i.status === "active" || i.status === "pending") || [];
+      const completedInvests = investments.data?.filter(i => i.status === "completed") || [];
+
+      const totalDeposited = approvedDeposits.reduce((sum, d) => sum + Number(d.amount), 0);
+      const totalWithdrawn = approvedWithdrawals.reduce((sum, w) => sum + Number(w.amount), 0);
+      const investedAmount = activeInvests.reduce((sum, i) => sum + Number(i.amount), 0);
+      const returnedAmount = completedInvests.reduce((sum, i) => sum + Number(i.expected_return || 0), 0);
+
+      const calculatedBalance = totalDeposited - totalWithdrawn - investedAmount + returnedAmount;
+      setBalance(Math.max(0, calculatedBalance));
 
       const allTransactions: Transaction[] = [
         ...(deposits.data?.map((d) => ({ ...d, type: "deposit" as const })) || []),
         ...(withdrawals.data?.map((w) => ({ ...w, type: "withdrawal" as const })) || []),
-        ...(investments.data?.map((i) => ({ ...i, type: "investment" as const })) || []),
+        ...(investments.data?.map((i) => ({ id: i.id, amount: i.amount, status: i.status, created_at: i.created_at, type: "investment" as const })) || []),
       ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
       setTransactions(allTransactions.slice(0, 10));
@@ -80,14 +87,6 @@ const Wallet = () => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-    }).format(amount);
   };
 
   const formatDate = (dateString: string) => {
@@ -161,12 +160,17 @@ const Wallet = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {isLoading || priceLoading ? (
                 <Skeleton className="h-10 w-32" />
               ) : (
-                <div className="text-3xl md:text-4xl font-bold text-gradient-gold">
-                  {formatCurrency(balance)}
-                </div>
+                <>
+                  <div className="text-3xl md:text-4xl font-bold text-gradient-gold">
+                    {formatBTC(balance)}
+                  </div>
+                  <div className="text-lg text-muted-foreground mt-1">
+                    {formatUSD(balance)}
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
@@ -175,15 +179,15 @@ const Wallet = () => {
             <CardHeader className="pb-2">
               <CardDescription className="flex items-center gap-2">
                 <Bitcoin className="w-4 h-4" />
-                Bitcoin Equivalent
+                BTC Price
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {priceLoading ? (
                 <Skeleton className="h-10 w-32" />
               ) : (
                 <div className="text-3xl md:text-4xl font-bold">
-                  {(balance / 104250).toFixed(6)} BTC
+                  ${btcPrice.toLocaleString()}
                 </div>
               )}
             </CardContent>
@@ -260,7 +264,10 @@ const Wallet = () => {
                         tx.type === "withdrawal" ? "text-destructive" : ""
                       )}>
                         {tx.type === "deposit" ? "+" : tx.type === "withdrawal" ? "-" : ""}
-                        {formatCurrency(tx.amount)}
+                        {formatBTC(tx.amount)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {formatUSD(tx.amount)}
                       </div>
                       <div className={cn("text-sm capitalize", getStatusColor(tx.status))}>
                         {tx.status}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useBTCPrice } from "@/hooks/useBTCPrice";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,7 @@ const Deposit = () => {
   const { user, isLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { formatBTC, formatUSD, btcPrice } = useBTCPrice();
   
   const [depositAddress, setDepositAddress] = useState<DepositAddress | null>(null);
   const [deposits, setDeposits] = useState<Deposit[]>([]);
@@ -259,6 +261,11 @@ const Deposit = () => {
                     onChange={(e) => setAmount(e.target.value)}
                     required
                   />
+                  {amount && parseFloat(amount) > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      ≈ {formatUSD(parseFloat(amount))} (1 BTC = ${btcPrice.toLocaleString()})
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="txid">Transaction ID (Optional)</Label>
@@ -303,7 +310,8 @@ const Deposit = () => {
                     className="flex items-center justify-between p-4 bg-muted/50 rounded-lg"
                   >
                     <div>
-                      <p className="font-medium">{deposit.amount.toFixed(8)} BTC</p>
+                      <p className="font-medium">{formatBTC(deposit.amount)}</p>
+                      <p className="text-xs text-muted-foreground">{formatUSD(deposit.amount)}</p>
                       <p className="text-sm text-muted-foreground">
                         {formatDate(deposit.created_at)}
                       </p>
