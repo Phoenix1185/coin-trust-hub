@@ -690,10 +690,10 @@ const Admin = () => {
     }
   };
 
-  // Investment Actions
+  // Investment Actions - Updated for 24-hour rolling settlement model
   const handleActivateInvestment = async (investment: Investment) => {
     try {
-      const startDate = new Date();
+      const activationTime = new Date();
       const { data: plan } = await supabase
         .from("investment_plans")
         .select("duration_days, roi_percentage")
@@ -702,26 +702,41 @@ const Admin = () => {
 
       if (!plan) throw new Error("Plan not found");
 
-      const endDate = new Date(startDate);
+      const endDate = new Date(activationTime);
       endDate.setDate(endDate.getDate() + plan.duration_days);
 
-      const expectedReturn = investment.amount + (investment.amount * plan.roi_percentage) / 100;
+      // Calculate total expected profit
+      const totalProfit = investment.amount * plan.roi_percentage / 100;
+      const expectedReturn = investment.amount + totalProfit;
 
       const { error } = await supabase
         .from("user_investments")
         .update({
           status: "active",
-          start_date: startDate.toISOString(),
+          start_date: activationTime.toISOString(),
           end_date: endDate.toISOString(),
           expected_return: expectedReturn,
+          // New settlement fields
+          activated_at: activationTime.toISOString(),
+          last_settlement_at: activationTime.toISOString(),
+          settlement_count: 0,
+          accrued_profit: 0,
+          total_profit: totalProfit,
         })
         .eq("id", investment.id);
 
       if (error) throw error;
 
-      await logAdminAction("activate_investment", "investment", investment.id, { amount: investment.amount });
+      await logAdminAction("activate_investment", "investment", investment.id, { 
+        amount: investment.amount,
+        total_profit: totalProfit,
+        duration_days: plan.duration_days,
+      });
 
-      toast({ title: "Investment Activated", description: "Investment is now active." });
+      toast({ 
+        title: "Investment Activated", 
+        description: `Investment is now active. Daily profit of ${(totalProfit / plan.duration_days).toFixed(8)} BTC will settle every 24 hours.` 
+      });
       fetchAllData();
     } catch (error) {
       console.error("Error activating investment:", error);

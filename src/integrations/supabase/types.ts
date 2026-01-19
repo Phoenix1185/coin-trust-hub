@@ -372,41 +372,56 @@ export type Database = {
       }
       user_investments: {
         Row: {
+          accrued_profit: number | null
+          activated_at: string | null
           actual_return: number | null
           amount: number
           created_at: string
           end_date: string | null
           expected_return: number | null
           id: string
+          last_settlement_at: string | null
           plan_id: string
+          settlement_count: number | null
           start_date: string | null
           status: Database["public"]["Enums"]["investment_status"]
+          total_profit: number | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          accrued_profit?: number | null
+          activated_at?: string | null
           actual_return?: number | null
           amount: number
           created_at?: string
           end_date?: string | null
           expected_return?: number | null
           id?: string
+          last_settlement_at?: string | null
           plan_id: string
+          settlement_count?: number | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["investment_status"]
+          total_profit?: number | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          accrued_profit?: number | null
+          activated_at?: string | null
           actual_return?: number | null
           amount?: number
           created_at?: string
           end_date?: string | null
           expected_return?: number | null
           id?: string
+          last_settlement_at?: string | null
           plan_id?: string
+          settlement_count?: number | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["investment_status"]
+          total_profit?: number | null
           updated_at?: string
           user_id?: string
         }

@@ -8,11 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { TrendingUp, Clock, CheckCircle, AlertCircle, Zap } from "lucide-react";
+import { TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
+import InvestmentProgressCard from "@/components/InvestmentProgressCard";
 
 interface InvestmentPlan {
   id: string;
@@ -32,6 +32,11 @@ interface UserInvestment {
   start_date: string | null;
   end_date: string | null;
   expected_return: number | null;
+  activated_at: string | null;
+  last_settlement_at: string | null;
+  settlement_count: number | null;
+  accrued_profit: number | null;
+  total_profit: number | null;
   investment_plans: {
     name: string;
     duration_days: number;
@@ -85,7 +90,7 @@ const Investments = () => {
 
     if (!user) return;
 
-    // Fetch user investments
+    // Fetch user investments with new settlement fields
     const { data: investmentsData } = await supabase
       .from("user_investments")
       .select(`
@@ -104,6 +109,8 @@ const Investments = () => {
         ...i,
         amount: Number(i.amount),
         expected_return: i.expected_return ? Number(i.expected_return) : null,
+        accrued_profit: i.accrued_profit ? Number(i.accrued_profit) : null,
+        total_profit: i.total_profit ? Number(i.total_profit) : null,
       })));
     }
 
@@ -218,39 +225,6 @@ const Investments = () => {
     setIsSubmitting(false);
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "active":
-        return <Zap className="w-4 h-4 text-success" />;
-      case "completed":
-        return <CheckCircle className="w-4 h-4 text-success" />;
-      case "pending":
-        return <Clock className="w-4 h-4 text-warning" />;
-      case "cancelled":
-        return <AlertCircle className="w-4 h-4 text-destructive" />;
-      default:
-        return null;
-    }
-  };
-
-  const getProgress = (investment: UserInvestment) => {
-    if (!investment.start_date || !investment.end_date) return 0;
-    const start = new Date(investment.start_date).getTime();
-    const end = new Date(investment.end_date).getTime();
-    const now = Date.now();
-    const progress = ((now - start) / (end - start)) * 100;
-    return Math.min(100, Math.max(0, progress));
-  };
-
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return "Pending";
-    return new Date(dateString).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  };
-
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -322,10 +296,11 @@ const Investments = () => {
           ))}
         </div>
 
-        {/* User Investments */}
+        {/* User Investments - Now using InvestmentProgressCard */}
         <Card>
           <CardHeader>
             <CardTitle>Your Investments</CardTitle>
+            <p className="text-sm text-muted-foreground">Track your investment progress and daily profit settlements</p>
           </CardHeader>
           <CardContent>
             {userInvestments.length === 0 ? (
@@ -337,46 +312,11 @@ const Investments = () => {
             ) : (
               <div className="space-y-4">
                 {userInvestments.map((investment) => (
-                  <div
-                    key={investment.id}
-                    className="p-4 bg-muted/50 rounded-lg space-y-3"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        {getStatusIcon(investment.status)}
-                        <div>
-                          <p className="font-medium">{investment.investment_plans.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {formatFiatAmount(btcToUSD(investment.amount), currency)} invested
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatBTC(investment.amount)}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-medium text-success">
-                          +{formatFiatAmount(btcToUSD(investment.expected_return || 0), currency)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          +{formatBTC(investment.expected_return || 0)}
-                        </p>
-                        <p className="text-sm text-muted-foreground capitalize">
-                          {investment.status}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    {investment.status === "active" && (
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                          <span>{formatDate(investment.start_date)}</span>
-                          <span>{formatDate(investment.end_date)}</span>
-                        </div>
-                        <Progress value={getProgress(investment)} className="h-2" />
-                      </div>
-                    )}
-                  </div>
+                  <InvestmentProgressCard 
+                    key={investment.id} 
+                    investment={investment} 
+                    currency={currency} 
+                  />
                 ))}
               </div>
             )}
