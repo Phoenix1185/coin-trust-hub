@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useBTCPrice } from "@/hooks/useBTCPrice";
+import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
 import DashboardLayout from "@/components/DashboardLayout";
 import CryptoChart from "@/components/CryptoChart";
 import LiveTicker from "@/components/LiveTicker";
@@ -38,6 +40,11 @@ interface RecentActivity {
 const Dashboard = () => {
   const { user, isLoading } = useAuth();
   const navigate = useNavigate();
+  const { formatBTC, formatUSD } = useBTCPrice();
+  
+  // Enable realtime notifications
+  useRealtimeNotifications();
+  
   const [stats, setStats] = useState<DashboardStats>({
     balance: 0,
     totalDeposits: 0,
@@ -68,20 +75,23 @@ const Dashboard = () => {
       // Fetch deposits
       const { data: deposits } = await supabase
         .from("deposits")
-        .select("amount, status")
-        .eq("user_id", user.id);
+        .select("amount, status, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
 
       // Fetch withdrawals
       const { data: withdrawals } = await supabase
         .from("withdrawals")
-        .select("amount, status")
-        .eq("user_id", user.id);
+        .select("amount, status, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
 
       // Fetch investments
       const { data: investments } = await supabase
         .from("user_investments")
-        .select("amount, status, expected_return")
-        .eq("user_id", user.id);
+        .select("amount, status, expected_return, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
 
       // Calculate stats
       const approvedDeposits = deposits?.filter(d => d.status === "approved") || [];
@@ -112,16 +122,25 @@ const Dashboard = () => {
           type: "deposit" as const,
           amount: Number(d.amount),
           status: d.status,
-          created_at: new Date().toISOString(),
+          created_at: d.created_at,
         })) || []),
         ...(withdrawals?.map(w => ({
           id: crypto.randomUUID(),
           type: "withdrawal" as const,
           amount: Number(w.amount),
           status: w.status,
-          created_at: new Date().toISOString(),
+          created_at: w.created_at,
         })) || []),
-      ].slice(0, 5);
+        ...(investments?.map(i => ({
+          id: crypto.randomUUID(),
+          type: "investment" as const,
+          amount: Number(i.amount),
+          status: i.status,
+          created_at: i.created_at,
+        })) || []),
+      ]
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, 5);
 
       setRecentActivity(activity);
     } catch (error) {
@@ -139,22 +158,16 @@ const Dashboard = () => {
     );
   }
 
-  const formatBTC = (amount: number) => `${amount.toFixed(4)} BTC`;
-  const formatUSD = (btc: number) => {
-    const usdValue = btc * 104250; // Demo BTC price
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-    }).format(usdValue);
-  };
-
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "approved":
+      case "completed":
+      case "active":
         return <CheckCircle className="w-4 h-4 text-success" />;
       case "pending":
         return <Clock className="w-4 h-4 text-warning" />;
       case "declined":
+      case "cancelled":
         return <AlertCircle className="w-4 h-4 text-destructive" />;
       default:
         return null;
@@ -168,87 +181,118 @@ const Dashboard = () => {
         <LiveTicker />
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-4 md:space-y-6">
         {/* Welcome Section */}
         <div>
-          <h1 className="text-2xl font-bold">Welcome back!</h1>
-          <p className="text-muted-foreground">Here's an overview of your investments.</p>
+          <h1 className="text-xl md:text-2xl font-bold">Welcome back!</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Here's an overview of your investments.</p>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Stats Cards - Mobile optimized 2x2 grid */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Available Balance</p>
-                  <p className="text-2xl font-bold text-primary">{formatBTC(stats.balance)}</p>
-                  <p className="text-xs text-muted-foreground">{formatUSD(stats.balance)}</p>
+            <CardContent className="p-4 md:p-6">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs md:text-sm text-muted-foreground">Available Balance</p>
+                  <p className="text-lg md:text-2xl font-bold text-primary truncate">{formatBTC(stats.balance)}</p>
+                  <p className="text-xs text-muted-foreground truncate">{formatUSD(stats.balance)}</p>
                 </div>
-                <div className="p-3 bg-primary/20 rounded-full">
-                  <Wallet className="w-6 h-6 text-primary" />
+                <div className="p-2 md:p-3 bg-primary/20 rounded-full self-start md:self-center">
+                  <Wallet className="w-4 h-4 md:w-6 md:h-6 text-primary" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Deposits</p>
-                  <p className="text-2xl font-bold">{formatBTC(stats.totalDeposits)}</p>
+            <CardContent className="p-4 md:p-6">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs md:text-sm text-muted-foreground">Total Deposits</p>
+                  <p className="text-lg md:text-2xl font-bold truncate">{formatBTC(stats.totalDeposits)}</p>
                   {stats.pendingDeposits > 0 && (
                     <p className="text-xs text-warning">{stats.pendingDeposits} pending</p>
                   )}
                 </div>
-                <div className="p-3 bg-success/20 rounded-full">
-                  <ArrowDownCircle className="w-6 h-6 text-success" />
+                <div className="p-2 md:p-3 bg-success/20 rounded-full self-start md:self-center">
+                  <ArrowDownCircle className="w-4 h-4 md:w-6 md:h-6 text-success" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Withdrawals</p>
-                  <p className="text-2xl font-bold">{formatBTC(stats.totalWithdrawals)}</p>
+            <CardContent className="p-4 md:p-6">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs md:text-sm text-muted-foreground">Total Withdrawals</p>
+                  <p className="text-lg md:text-2xl font-bold truncate">{formatBTC(stats.totalWithdrawals)}</p>
                   {stats.pendingWithdrawals > 0 && (
                     <p className="text-xs text-warning">{stats.pendingWithdrawals} pending</p>
                   )}
                 </div>
-                <div className="p-3 bg-muted rounded-full">
-                  <ArrowUpCircle className="w-6 h-6 text-muted-foreground" />
+                <div className="p-2 md:p-3 bg-muted rounded-full self-start md:self-center">
+                  <ArrowUpCircle className="w-4 h-4 md:w-6 md:h-6 text-muted-foreground" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Active Investments</p>
-                  <p className="text-2xl font-bold">{stats.activeInvestments}</p>
+            <CardContent className="p-4 md:p-6">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs md:text-sm text-muted-foreground">Active Investments</p>
+                  <p className="text-lg md:text-2xl font-bold">{stats.activeInvestments}</p>
                   <p className="text-xs text-muted-foreground">plans active</p>
                 </div>
-                <div className="p-3 bg-primary/20 rounded-full">
-                  <TrendingUp className="w-6 h-6 text-primary" />
+                <div className="p-2 md:p-3 bg-primary/20 rounded-full self-start md:self-center">
+                  <TrendingUp className="w-4 h-4 md:w-6 md:h-6 text-primary" />
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Chart and Quick Actions */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Quick Actions - Mobile first */}
+        <Card className="lg:hidden">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Quick Actions</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-3 gap-2">
+            <Button
+              className="flex-col h-auto py-3 bg-success hover:bg-success/90 text-success-foreground"
+              onClick={() => navigate("/deposit")}
+            >
+              <ArrowDownCircle className="w-5 h-5 mb-1" />
+              <span className="text-xs">Deposit</span>
+            </Button>
+            <Button
+              className="flex-col h-auto py-3"
+              variant="outline"
+              onClick={() => navigate("/withdraw")}
+            >
+              <ArrowUpCircle className="w-5 h-5 mb-1" />
+              <span className="text-xs">Withdraw</span>
+            </Button>
+            <Button
+              className="flex-col h-auto py-3 bg-primary hover:bg-primary/90"
+              onClick={() => navigate("/investments")}
+            >
+              <TrendingUp className="w-5 h-5 mb-1" />
+              <span className="text-xs">Invest</span>
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Chart and Quick Actions - Desktop */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
           <div className="lg:col-span-2">
             <CryptoChart />
           </div>
 
-          <Card>
+          <Card className="hidden lg:block">
             <CardHeader>
               <CardTitle>Quick Actions</CardTitle>
             </CardHeader>
@@ -281,42 +325,44 @@ const Dashboard = () => {
 
         {/* Recent Activity */}
         <Card>
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg md:text-xl">Recent Activity</CardTitle>
           </CardHeader>
           <CardContent>
             {recentActivity.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className="text-center py-6 md:py-8 text-muted-foreground">
                 <p>No recent activity</p>
                 <p className="text-sm">Start by making a deposit!</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {recentActivity.map((activity) => (
                   <div
                     key={activity.id}
-                    className="flex items-center justify-between p-4 bg-muted/50 rounded-lg"
+                    className="flex items-center justify-between p-3 md:p-4 bg-muted/50 rounded-lg"
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 md:gap-3 min-w-0">
                       {activity.type === "deposit" ? (
-                        <ArrowDownCircle className="w-5 h-5 text-success" />
+                        <ArrowDownCircle className="w-4 h-4 md:w-5 md:h-5 text-success flex-shrink-0" />
+                      ) : activity.type === "withdrawal" ? (
+                        <ArrowUpCircle className="w-4 h-4 md:w-5 md:h-5 text-primary flex-shrink-0" />
                       ) : (
-                        <ArrowUpCircle className="w-5 h-5 text-primary" />
+                        <TrendingUp className="w-4 h-4 md:w-5 md:h-5 text-primary flex-shrink-0" />
                       )}
-                      <div>
-                        <p className="font-medium capitalize">{activity.type}</p>
-                        <p className="text-sm text-muted-foreground">
+                      <div className="min-w-0">
+                        <p className="font-medium capitalize text-sm md:text-base">{activity.type}</p>
+                        <p className="text-xs md:text-sm text-muted-foreground truncate">
                           {formatBTC(activity.amount)}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
                       {getStatusIcon(activity.status)}
                       <span className={cn(
-                        "text-sm capitalize",
-                        activity.status === "approved" && "text-success",
+                        "text-xs md:text-sm capitalize",
+                        (activity.status === "approved" || activity.status === "active" || activity.status === "completed") && "text-success",
                         activity.status === "pending" && "text-warning",
-                        activity.status === "declined" && "text-destructive"
+                        (activity.status === "declined" || activity.status === "cancelled") && "text-destructive"
                       )}>
                         {activity.status}
                       </span>
