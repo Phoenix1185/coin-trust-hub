@@ -2,10 +2,13 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
+type CurrencyCode = "USD" | "EUR" | "GBP";
+
 interface Profile {
   full_name: string | null;
   email: string;
   avatar_url: string | null;
+  preferred_currency: CurrencyCode;
 }
 
 interface AuthContextType {
@@ -14,11 +17,12 @@ interface AuthContextType {
   profile: Profile | null;
   isLoading: boolean;
   isAdmin: boolean;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, fullName: string, currency?: CurrencyCode) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signInWithGoogle: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  updateCurrency: (currency: CurrencyCode) => Promise<{ error: Error | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -70,7 +74,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const { data, error } = await supabase
         .from("profiles")
-        .select("full_name, email, avatar_url")
+        .select("full_name, email, avatar_url, preferred_currency")
         .eq("user_id", userId)
         .maybeSingle();
 
@@ -80,7 +84,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (data) {
-        setProfile(data);
+        setProfile({
+          ...data,
+          preferred_currency: (data.preferred_currency as CurrencyCode) || "USD",
+        });
       }
     } catch (err) {
       console.error("Error fetching profile:", err);
@@ -115,7 +122,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const signUp = async (email: string, password: string, fullName: string) => {
+  const signUp = async (email: string, password: string, fullName: string, currency: CurrencyCode = "USD") => {
     const redirectUrl = `${window.location.origin}/`;
     
     const { error } = await supabase.auth.signUp({
@@ -125,6 +132,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         emailRedirectTo: redirectUrl,
         data: {
           full_name: fullName,
+          preferred_currency: currency,
         },
       },
     });
@@ -160,6 +168,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsAdmin(false);
   };
 
+  const updateCurrency = async (currency: CurrencyCode) => {
+    if (!user) return { error: new Error("Not authenticated") };
+    
+    const { error } = await supabase
+      .from("profiles")
+      .update({ preferred_currency: currency })
+      .eq("user_id", user.id);
+    
+    if (!error && profile) {
+      setProfile({ ...profile, preferred_currency: currency });
+    }
+    
+    return { error };
+  };
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -172,6 +195,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       signInWithGoogle,
       signOut,
       refreshProfile,
+      updateCurrency,
     }}>
       {children}
     </AuthContext.Provider>
@@ -185,3 +209,5 @@ export const useAuth = () => {
   }
   return context;
 };
+
+export type { CurrencyCode };

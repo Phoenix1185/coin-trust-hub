@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, type CurrencyCode } from "@/hooks/useAuth";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,9 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { User, Shield, Bell, Wallet, Save, Eye, EyeOff, Lock } from "lucide-react";
+import { User, Shield, Bell, Wallet, Save, Eye, EyeOff, Lock, Globe } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -21,7 +22,7 @@ import {
 } from "@/components/ui/dialog";
 
 const Settings = () => {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, profile: authProfile, isLoading: authLoading, updateCurrency, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
@@ -29,8 +30,10 @@ const Settings = () => {
   const [showWallet, setShowWallet] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [selectedCurrency, setSelectedCurrency] = useState<CurrencyCode>(authProfile?.preferred_currency || "USD");
+  const [isSavingCurrency, setIsSavingCurrency] = useState(false);
 
-  const [profile, setProfile] = useState({
+  const [profileForm, setProfileForm] = useState({
     full_name: "",
     email: "",
     phone: "",
@@ -57,6 +60,12 @@ const Settings = () => {
   }, [user, authLoading, navigate]);
 
   useEffect(() => {
+    if (authProfile?.preferred_currency) {
+      setSelectedCurrency(authProfile.preferred_currency);
+    }
+  }, [authProfile?.preferred_currency]);
+
+  useEffect(() => {
     if (user) {
       fetchProfile();
     }
@@ -73,7 +82,7 @@ const Settings = () => {
         .single();
 
       if (data) {
-        setProfile({
+        setProfileForm({
           full_name: data.full_name || "",
           email: data.email || user.email || "",
           phone: data.phone || "",
@@ -95,9 +104,9 @@ const Settings = () => {
       const { error } = await supabase
         .from("profiles")
         .update({
-          full_name: profile.full_name,
-          phone: profile.phone,
-          wallet_address: profile.wallet_address,
+          full_name: profileForm.full_name,
+          phone: profileForm.phone,
+          wallet_address: profileForm.wallet_address,
           updated_at: new Date().toISOString(),
         })
         .eq("user_id", user.id);
@@ -175,6 +184,29 @@ const Settings = () => {
     }
   };
 
+  const handleSaveCurrency = async () => {
+    setIsSavingCurrency(true);
+    try {
+      const { error } = await updateCurrency(selectedCurrency);
+      if (error) throw error;
+      
+      await refreshProfile();
+      toast({
+        title: "Currency Updated",
+        description: `Your preferred currency is now ${selectedCurrency}.`,
+      });
+    } catch (error) {
+      console.error("Error updating currency:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update currency preference.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingCurrency(false);
+    }
+  };
+
   if (authLoading) {
     return (
       <DashboardLayout>
@@ -220,8 +252,8 @@ const Settings = () => {
                     <Label htmlFor="fullName">Full Name</Label>
                     <Input
                       id="fullName"
-                      value={profile.full_name}
-                      onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
+                      value={profileForm.full_name}
+                      onChange={(e) => setProfileForm({ ...profileForm, full_name: e.target.value })}
                       placeholder="Enter your full name"
                     />
                   </div>
@@ -229,7 +261,7 @@ const Settings = () => {
                     <Label htmlFor="email">Email</Label>
                     <Input
                       id="email"
-                      value={profile.email}
+                      value={profileForm.email}
                       disabled
                       className="bg-muted"
                     />
@@ -239,8 +271,8 @@ const Settings = () => {
                   <Label htmlFor="phone">Phone Number</Label>
                   <Input
                     id="phone"
-                    value={profile.phone}
-                    onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                    value={profileForm.phone}
+                    onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
                     placeholder="+1 (555) 000-0000"
                   />
                 </div>
@@ -268,8 +300,8 @@ const Settings = () => {
                   <Input
                     id="wallet"
                     type={showWallet ? "text" : "password"}
-                    value={profile.wallet_address}
-                    onChange={(e) => setProfile({ ...profile, wallet_address: e.target.value })}
+                    value={profileForm.wallet_address}
+                    onChange={(e) => setProfileForm({ ...profileForm, wallet_address: e.target.value })}
                     placeholder="Enter your BTC wallet address"
                     className="pr-10"
                   />
@@ -286,6 +318,43 @@ const Settings = () => {
                 </p>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Currency Preferences */}
+        <Card>
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+              <Globe className="w-5 h-5 text-primary" />
+              Currency Preferences
+            </CardTitle>
+            <CardDescription>Choose your preferred display currency</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Display Currency</Label>
+              <Select value={selectedCurrency} onValueChange={(val) => setSelectedCurrency(val as CurrencyCode)}>
+                <SelectTrigger className="w-full md:w-64">
+                  <SelectValue placeholder="Select currency" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="USD">$ US Dollar (USD)</SelectItem>
+                  <SelectItem value="EUR">€ Euro (EUR)</SelectItem>
+                  <SelectItem value="GBP">£ British Pound (GBP)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                All amounts will be displayed in your preferred currency with BTC equivalent shown below.
+              </p>
+            </div>
+            <Button 
+              onClick={handleSaveCurrency} 
+              disabled={isSavingCurrency || selectedCurrency === authProfile?.preferred_currency}
+              variant="outline"
+              size="sm"
+            >
+              {isSavingCurrency ? "Saving..." : "Update Currency"}
+            </Button>
           </CardContent>
         </Card>
 
