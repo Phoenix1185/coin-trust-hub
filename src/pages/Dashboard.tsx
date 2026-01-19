@@ -38,9 +38,11 @@ interface RecentActivity {
 }
 
 const Dashboard = () => {
-  const { user, isLoading } = useAuth();
+  const { user, profile, isLoading } = useAuth();
   const navigate = useNavigate();
   const { formatBTC, formatUSD } = useBTCPrice();
+  
+  const displayName = profile?.full_name || user?.email?.split("@")[0] || "User";
   
   // Enable realtime notifications
   useRealtimeNotifications();
@@ -184,7 +186,7 @@ const Dashboard = () => {
       <div className="space-y-4">
         {/* Welcome Section */}
         <div>
-          <h1 className="text-lg sm:text-xl md:text-2xl font-bold">Welcome back!</h1>
+          <h1 className="text-lg sm:text-xl md:text-2xl font-bold">Welcome back, {displayName}!</h1>
           <p className="text-xs sm:text-sm text-muted-foreground">Here's an overview of your investments.</p>
         </div>
 

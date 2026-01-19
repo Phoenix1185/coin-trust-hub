@@ -85,24 +85,15 @@ const Withdraw = () => {
       })));
     }
 
-    // Fetch balance
-    const { data: deposits } = await supabase
-      .from("deposits")
-      .select("amount, status")
-      .eq("user_id", user.id);
+    // Use the database function for accurate balance calculation
+    // This properly accounts for invested amounts
+    const { data: balanceData, error: balanceError } = await supabase.rpc("get_user_balance", {
+      _user_id: user.id,
+    });
 
-    const { data: allWithdrawals } = await supabase
-      .from("withdrawals")
-      .select("amount, status")
-      .eq("user_id", user.id);
-
-    const approvedDeposits = deposits?.filter(d => d.status === "approved") || [];
-    const approvedWithdrawals = allWithdrawals?.filter(w => w.status === "approved") || [];
-
-    const totalDeposited = approvedDeposits.reduce((sum, d) => sum + Number(d.amount), 0);
-    const totalWithdrawn = approvedWithdrawals.reduce((sum, w) => sum + Number(w.amount), 0);
-
-    setBalance(Math.max(0, totalDeposited - totalWithdrawn));
+    if (!balanceError && balanceData !== null) {
+      setBalance(Math.max(0, Number(balanceData)));
+    }
 
     // Check investment duration
     const { data: investments } = await supabase
