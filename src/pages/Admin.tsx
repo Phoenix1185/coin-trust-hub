@@ -147,6 +147,19 @@ interface InvestmentPlan {
   created_at: string;
 }
 
+interface PaymentMethod {
+  id: string;
+  name: string;
+  type: string;
+  icon: string;
+  description: string | null;
+  wallet_address: string | null;
+  instructions: string | null;
+  is_active: boolean | null;
+  display_order: number | null;
+  created_at: string;
+}
+
 interface WithdrawalSettings {
   min_investment_days: number;
   min_withdrawal_amount: number;
@@ -224,6 +237,7 @@ const Admin = () => {
   // New data
   const [depositAddresses, setDepositAddresses] = useState<DepositAddress[]>([]);
   const [investmentPlans, setInvestmentPlans] = useState<InvestmentPlan[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [adminLogs, setAdminLogs] = useState<AdminActivityLog[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [withdrawalSettings, setWithdrawalSettings] = useState<WithdrawalSettings>({
@@ -304,6 +318,20 @@ const Admin = () => {
   const [selectedUserForActivity, setSelectedUserForActivity] = useState<User | null>(null);
   const [userActivityLogs, setUserActivityLogs] = useState<AdminActivityLog[]>([]);
 
+  // Payment Method Dialog states
+  const [paymentMethodDialogOpen, setPaymentMethodDialogOpen] = useState(false);
+  const [editingPaymentMethod, setEditingPaymentMethod] = useState<PaymentMethod | null>(null);
+  const [paymentMethodForm, setPaymentMethodForm] = useState({
+    name: "",
+    type: "both",
+    icon: "bitcoin",
+    description: "",
+    wallet_address: "",
+    instructions: "",
+    display_order: 0,
+    is_active: true,
+  });
+
   // Auth check
   useEffect(() => {
     if (!authLoading) {
@@ -328,6 +356,7 @@ const Admin = () => {
       fetchFAQs();
       fetchDepositAddresses();
       fetchInvestmentPlans();
+      fetchPaymentMethods();
       fetchWithdrawalSettings();
       fetchAdminLogs();
       fetchNotifications();
@@ -382,6 +411,14 @@ const Admin = () => {
       .select("*")
       .order("created_at", { ascending: false });
     if (data) setInvestmentPlans(data);
+  };
+
+  const fetchPaymentMethods = async () => {
+    const { data } = await supabase
+      .from("payment_methods")
+      .select("*")
+      .order("display_order", { ascending: true });
+    if (data) setPaymentMethods(data);
   };
 
   const fetchWithdrawalSettings = async () => {
@@ -903,6 +940,85 @@ const Admin = () => {
     }
   };
 
+  // Payment Method Actions
+  const handleSavePaymentMethod = async () => {
+    try {
+      if (editingPaymentMethod) {
+        const { error } = await supabase
+          .from("payment_methods")
+          .update({
+            name: paymentMethodForm.name,
+            type: paymentMethodForm.type,
+            icon: paymentMethodForm.icon,
+            description: paymentMethodForm.description || null,
+            wallet_address: paymentMethodForm.wallet_address || null,
+            instructions: paymentMethodForm.instructions || null,
+            display_order: paymentMethodForm.display_order,
+            is_active: paymentMethodForm.is_active,
+          })
+          .eq("id", editingPaymentMethod.id);
+
+        if (error) throw error;
+        await logAdminAction("update_payment_method", "payment_method", editingPaymentMethod.id);
+        toast({ title: "Payment Method Updated", description: "Payment method has been updated." });
+      } else {
+        const { error } = await supabase.from("payment_methods").insert({
+          name: paymentMethodForm.name,
+          type: paymentMethodForm.type,
+          icon: paymentMethodForm.icon,
+          description: paymentMethodForm.description || null,
+          wallet_address: paymentMethodForm.wallet_address || null,
+          instructions: paymentMethodForm.instructions || null,
+          display_order: paymentMethodForm.display_order,
+          is_active: paymentMethodForm.is_active,
+        });
+
+        if (error) throw error;
+        await logAdminAction("create_payment_method", "payment_method");
+        toast({ title: "Payment Method Created", description: "New payment method has been added." });
+      }
+
+      setPaymentMethodDialogOpen(false);
+      setEditingPaymentMethod(null);
+      setPaymentMethodForm({ name: "", type: "both", icon: "bitcoin", description: "", wallet_address: "", instructions: "", display_order: 0, is_active: true });
+      fetchPaymentMethods();
+    } catch (error) {
+      console.error("Error saving payment method:", error);
+      toast({ title: "Error", description: "Failed to save payment method.", variant: "destructive" });
+    }
+  };
+
+  const handleDeletePaymentMethod = async (id: string) => {
+    try {
+      const { error } = await supabase.from("payment_methods").delete().eq("id", id);
+      if (error) throw error;
+      await logAdminAction("delete_payment_method", "payment_method", id);
+      toast({ title: "Payment Method Deleted", description: "Payment method has been deleted." });
+      fetchPaymentMethods();
+    } catch (error) {
+      console.error("Error deleting payment method:", error);
+      toast({ title: "Error", description: "Failed to delete payment method.", variant: "destructive" });
+    }
+  };
+
+  const handleCloseTicket = async (ticket: SupportTicket) => {
+    try {
+      const { error } = await supabase
+        .from("support_tickets")
+        .update({ status: "closed" })
+        .eq("id", ticket.id);
+
+      if (error) throw error;
+
+      await logAdminAction("close_ticket", "support_ticket", ticket.id);
+      toast({ title: "Ticket Closed", description: "Support ticket has been closed." });
+      fetchAllData();
+    } catch (error) {
+      console.error("Error closing ticket:", error);
+      toast({ title: "Error", description: "Failed to close ticket.", variant: "destructive" });
+    }
+  };
+
   // Ticket Actions
   const handleReplyToTicket = async () => {
     if (!selectedTicket || !replyMessage.trim()) return;
@@ -1261,6 +1377,7 @@ const Admin = () => {
             <TabsTrigger value="investments" className="text-xs md:text-sm">Investments</TabsTrigger>
             <TabsTrigger value="plans" className="text-xs md:text-sm">Plans</TabsTrigger>
             <TabsTrigger value="addresses" className="text-xs md:text-sm">Addresses</TabsTrigger>
+            <TabsTrigger value="payment-methods" className="text-xs md:text-sm">Payment Methods</TabsTrigger>
             <TabsTrigger value="tickets" className="text-xs md:text-sm">Tickets</TabsTrigger>
             <TabsTrigger value="users" className="text-xs md:text-sm">Users</TabsTrigger>
             <TabsTrigger value="faqs" className="text-xs md:text-sm">FAQs</TabsTrigger>
@@ -1494,6 +1611,70 @@ const Admin = () => {
             </Card>
           </TabsContent>
 
+          {/* Payment Methods Tab */}
+          <TabsContent value="payment-methods">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+                    <Wallet className="w-5 h-5 text-primary" />
+                    Payment Methods
+                  </CardTitle>
+                  <CardDescription>Manage deposit and withdrawal methods</CardDescription>
+                </div>
+                <Button onClick={() => { setEditingPaymentMethod(null); setPaymentMethodForm({ name: "", type: "both", icon: "bitcoin", description: "", wallet_address: "", instructions: "", display_order: 0, is_active: true }); setPaymentMethodDialogOpen(true); }}>
+                  <Plus className="w-4 h-4 mr-2" />Add Method
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {paymentMethods.length === 0 ? (
+                  <p className="text-center py-8 text-muted-foreground">No payment methods configured</p>
+                ) : (
+                  <div className="space-y-3">
+                    {paymentMethods.map((method) => (
+                      <div key={method.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-muted/30 rounded-lg gap-3">
+                        <div className="space-y-1 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium">{method.name}</span>
+                            <Badge variant="outline">{method.type}</Badge>
+                            {method.is_active ? (
+                              <Badge variant="outline" className="border-success text-success">Active</Badge>
+                            ) : (
+                              <Badge variant="secondary">Inactive</Badge>
+                            )}
+                          </div>
+                          {method.description && <p className="text-sm text-muted-foreground">{method.description}</p>}
+                          {method.wallet_address && <p className="text-xs text-muted-foreground font-mono break-all">Address: {method.wallet_address}</p>}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button variant="ghost" size="icon" onClick={() => { 
+                            setEditingPaymentMethod(method); 
+                            setPaymentMethodForm({ 
+                              name: method.name, 
+                              type: method.type, 
+                              icon: method.icon || "bitcoin", 
+                              description: method.description || "", 
+                              wallet_address: method.wallet_address || "", 
+                              instructions: method.instructions || "", 
+                              display_order: method.display_order || 0, 
+                              is_active: method.is_active ?? true 
+                            }); 
+                            setPaymentMethodDialogOpen(true); 
+                          }}>
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDeletePaymentMethod(method.id)}>
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           {/* Tickets Tab */}
           <TabsContent value="tickets">
             <Card>
@@ -1511,6 +1692,40 @@ const Admin = () => {
                   <p className="text-center py-8 text-muted-foreground">No support tickets</p>
                 ) : (
                   <div className="space-y-4">
+                    {tickets.map((ticket) => (
+                      <div key={ticket.id} className="p-4 bg-muted/30 rounded-lg space-y-3">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-medium">{ticket.subject}</span>
+                              {getStatusBadge(ticket.status)}
+                            </div>
+                            <p className="text-sm text-muted-foreground">{ticket.profiles?.email || "Unknown"}</p>
+                            <p className="text-xs text-muted-foreground">{formatDate(ticket.created_at)}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            {ticket.status === "open" && (
+                              <Button size="sm" onClick={() => { setSelectedTicket(ticket); setReplyDialogOpen(true); }}>
+                                <Reply className="w-4 h-4 mr-1" />Reply
+                              </Button>
+                            )}
+                            {ticket.status !== "closed" && (
+                              <Button size="sm" variant="outline" onClick={() => handleCloseTicket(ticket)}>
+                                <XCircle className="w-4 h-4 mr-1" />Close
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                        <p className="text-sm bg-muted/50 p-3 rounded">{ticket.message}</p>
+                        {ticket.response && (
+                          <div className="bg-primary/10 p-3 rounded">
+                            <p className="text-xs font-medium text-primary mb-1">Admin Response:</p>
+                            <p className="text-sm">{ticket.response}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                     {tickets.map((ticket) => (
                       <div key={ticket.id} className="p-4 bg-muted/30 rounded-lg space-y-3">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
