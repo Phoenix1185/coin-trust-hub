@@ -43,8 +43,8 @@ const Investments = () => {
   const { user, profile, isLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { formatBTC, btcPrice, btcToUSD, formatFiatAmount } = useBTCPrice();
-  const currency = profile?.preferred_currency || "USD";
+  const { formatBTC, btcPrice, btcToUSD, formatFiatAmount, fiatToBTC, getCurrencySymbol } = useBTCPrice();
+  const currency = (profile?.preferred_currency || "USD") as "USD" | "EUR" | "GBP";
   
   const [plans, setPlans] = useState<InvestmentPlan[]>([]);
   const [userInvestments, setUserInvestments] = useState<UserInvestment[]>([]);
@@ -145,8 +145,8 @@ const Investments = () => {
       return;
     }
 
-    const amount = parseFloat(investAmount);
-    if (isNaN(amount) || amount <= 0) {
+    const fiatAmount = parseFloat(investAmount);
+    if (isNaN(fiatAmount) || fiatAmount <= 0) {
       toast({
         title: "Invalid Amount",
         description: "Please enter a valid amount",
@@ -155,25 +155,28 @@ const Investments = () => {
       return;
     }
 
-    if (amount < selectedPlan.min_amount) {
+    // Convert fiat input to BTC for validation and storage
+    const btcAmount = fiatToBTC(fiatAmount, currency);
+
+    if (fiatAmount < 50) {
       toast({
         title: "Amount Too Low",
-        description: `Minimum investment is ${selectedPlan.min_amount} BTC`,
+        description: `Minimum investment is ${getCurrencySymbol(currency)}50`,
         variant: "destructive",
       });
       return;
     }
 
-    if (amount > selectedPlan.max_amount) {
+    if (btcAmount > selectedPlan.max_amount) {
       toast({
         title: "Amount Too High",
-        description: `Maximum investment is ${selectedPlan.max_amount} BTC`,
+        description: `Maximum investment is ${formatFiatAmount(btcToUSD(selectedPlan.max_amount), currency)}`,
         variant: "destructive",
       });
       return;
     }
 
-    if (amount > balance) {
+    if (btcAmount > balance) {
       toast({
         title: "Insufficient Balance",
         description: "You don't have enough balance for this investment",
@@ -184,12 +187,13 @@ const Investments = () => {
 
     setIsSubmitting(true);
 
-    const expectedReturn = amount * (1 + selectedPlan.roi_percentage / 100);
+    const investBtcAmount = fiatToBTC(parseFloat(investAmount), currency);
+    const expectedReturn = investBtcAmount * (1 + selectedPlan.roi_percentage / 100);
 
     const { error } = await supabase.from("user_investments").insert({
       user_id: user.id,
       plan_id: selectedPlan.id,
-      amount: amount,
+      amount: investBtcAmount,
       status: "pending",
       expected_return: expectedReturn,
     });
@@ -305,7 +309,7 @@ const Investments = () => {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Min</span>
-                    <span>{formatFiatAmount(btcToUSD(plan.min_amount), currency)}</span>
+                    <span>{getCurrencySymbol(currency)}50</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Max</span>
@@ -390,40 +394,55 @@ const Investments = () => {
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label>Investment Amount (BTC)</Label>
-                <Input
-                  type="number"
-                  step="0.00000001"
-                  placeholder={`${selectedPlan?.min_amount} - ${selectedPlan?.max_amount}`}
-                  value={investAmount}
-                  onChange={(e) => setInvestAmount(e.target.value)}
-                />
+                <Label>Investment Amount ({currency})</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    {getCurrencySymbol(currency)}
+                  </span>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="50"
+                    placeholder="50.00"
+                    className="pl-8"
+                    value={investAmount}
+                    onChange={(e) => setInvestAmount(e.target.value)}
+                  />
+                </div>
+                {investAmount && parseFloat(investAmount) > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    ≈ {formatBTC(fiatToBTC(parseFloat(investAmount), currency))}
+                  </p>
+                )}
                 <p className="text-xs text-muted-foreground">
                   Available: {formatFiatAmount(btcToUSD(balance), currency)} ({formatBTC(balance)})
                 </p>
+                <p className="text-xs text-primary">
+                  Minimum investment: {getCurrencySymbol(currency)}50
+                </p>
               </div>
 
-              {investAmount && parseFloat(investAmount) > 0 && (
+              {investAmount && parseFloat(investAmount) >= 50 && (
                 <div className="p-4 bg-muted rounded-lg space-y-2">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Investment</span>
                     <div className="text-right">
-                      <span className="block">{formatFiatAmount(btcToUSD(parseFloat(investAmount)), currency)}</span>
-                      <span className="text-xs text-muted-foreground">{formatBTC(parseFloat(investAmount))}</span>
+                      <span className="block">{getCurrencySymbol(currency)}{parseFloat(investAmount).toFixed(2)}</span>
+                      <span className="text-xs text-muted-foreground">{formatBTC(fiatToBTC(parseFloat(investAmount), currency))}</span>
                     </div>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">ROI ({selectedPlan?.roi_percentage}%)</span>
                     <div className="text-right text-success">
-                      <span className="block">+{formatFiatAmount(btcToUSD(parseFloat(investAmount) * (selectedPlan?.roi_percentage || 0) / 100), currency)}</span>
-                      <span className="text-xs">+{formatBTC(parseFloat(investAmount) * (selectedPlan?.roi_percentage || 0) / 100)}</span>
+                      <span className="block">+{getCurrencySymbol(currency)}{(parseFloat(investAmount) * (selectedPlan?.roi_percentage || 0) / 100).toFixed(2)}</span>
+                      <span className="text-xs">+{formatBTC(fiatToBTC(parseFloat(investAmount), currency) * (selectedPlan?.roi_percentage || 0) / 100)}</span>
                     </div>
                   </div>
                   <div className="flex justify-between font-medium pt-2 border-t border-border">
                     <span>Expected Return</span>
                     <div className="text-right text-primary">
-                      <span className="block">{formatFiatAmount(btcToUSD(parseFloat(investAmount) * (1 + (selectedPlan?.roi_percentage || 0) / 100)), currency)}</span>
-                      <span className="text-xs">{formatBTC(parseFloat(investAmount) * (1 + (selectedPlan?.roi_percentage || 0) / 100))}</span>
+                      <span className="block">{getCurrencySymbol(currency)}{(parseFloat(investAmount) * (1 + (selectedPlan?.roi_percentage || 0) / 100)).toFixed(2)}</span>
+                      <span className="text-xs">{formatBTC(fiatToBTC(parseFloat(investAmount), currency) * (1 + (selectedPlan?.roi_percentage || 0) / 100))}</span>
                     </div>
                   </div>
                 </div>

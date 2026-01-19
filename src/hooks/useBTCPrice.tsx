@@ -137,6 +137,17 @@ export const useBTCPrice = () => {
     return usdAmount * exchangeRates[currency];
   }, [exchangeRates]);
 
+  // Convert from user currency to USD
+  const convertToUSD = useCallback((amount: number, currency: CurrencyCode): number => {
+    return amount / exchangeRates[currency];
+  }, [exchangeRates]);
+
+  // Convert from user's preferred currency to BTC
+  const fiatToBTC = useCallback((amount: number, currency: CurrencyCode): number => {
+    const usdAmount = convertToUSD(amount, currency);
+    return usdToBTC(usdAmount);
+  }, [convertToUSD, usdToBTC]);
+
   // Format a fiat amount in a specific currency
   const formatFiatAmount = useCallback((usdAmount: number, currency: CurrencyCode = "USD"): string => {
     const convertedAmount = convertFromUSD(usdAmount, currency);
@@ -185,6 +196,8 @@ export const useBTCPrice = () => {
     formatCurrency,
     formatWithBTC,
     convertFromUSD,
+    convertToUSD,
+    fiatToBTC,
     getCurrencySymbol,
     refreshPrices: fetchPrices,
     refreshExchangeRates: fetchExchangeRates,

@@ -539,7 +539,7 @@ const Support = () => {
                     <div className="p-3 bg-muted/30 rounded-lg">
                       <div className="font-medium text-sm">What's the minimum investment?</div>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Minimum investment starts at $100 for basic plans.
+                        Minimum investment starts at $50 for basic plans.
                       </p>
                     </div>
                     <div className="p-3 bg-muted/30 rounded-lg">
