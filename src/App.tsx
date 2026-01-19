@@ -20,6 +20,7 @@ import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import RiskDisclosure from "./pages/RiskDisclosure";
 import FAQ from "./pages/FAQ";
+import EmailVerified from "./pages/EmailVerified";
 import CookieConsent from "./components/CookieConsent";
 
 const queryClient = new QueryClient();
@@ -47,6 +48,7 @@ const App = () => (
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/risk-disclosure" element={<RiskDisclosure />} />
             <Route path="/faq" element={<FAQ />} />
+            <Route path="/email-verified" element={<EmailVerified />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           <CookieConsent />
