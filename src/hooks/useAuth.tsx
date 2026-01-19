@@ -23,6 +23,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   updateCurrency: (currency: CurrencyCode) => Promise<{ error: Error | null }>;
+  resendVerificationEmail: (email: string) => Promise<{ error: Error | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -123,18 +124,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signUp = async (email: string, password: string, fullName: string, currency: CurrencyCode = "USD") => {
-    const redirectUrl = `${window.location.origin}/email-verified`;
-    
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: redirectUrl,
         data: {
           full_name: fullName,
           preferred_currency: currency,
         },
       },
+    });
+    
+    return { error };
+  };
+
+  const resendVerificationEmail = async (email: string) => {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
     });
     
     return { error };
@@ -196,6 +203,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       signOut,
       refreshProfile,
       updateCurrency,
+      resendVerificationEmail,
     }}>
       {children}
     </AuthContext.Provider>

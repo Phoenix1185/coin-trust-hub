@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import Logo from "@/components/Logo";
-import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, Home } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, Home, RefreshCw } from "lucide-react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -20,14 +20,17 @@ const nameSchema = z.string().min(2, "Name must be at least 2 characters");
 const Auth = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, isLoading, signIn, signUp, signInWithGoogle } = useAuth();
+  const { user, isLoading, signIn, signUp, signInWithGoogle, resendVerificationEmail } = useAuth();
   const { toast } = useToast();
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [showResendEmail, setShowResendEmail] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
+  const [resendEmail, setResendEmail] = useState("");
   const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [isResendingEmail, setIsResendingEmail] = useState(false);
   
   // Login form state
   const [loginEmail, setLoginEmail] = useState("");
@@ -182,9 +185,7 @@ const Auth = () => {
     setIsResettingPassword(true);
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
+      const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail);
 
       if (error) throw error;
 
@@ -202,6 +203,46 @@ const Auth = () => {
       });
     } finally {
       setIsResettingPassword(false);
+    }
+  };
+
+  const handleResendEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      emailSchema.parse(resendEmail);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        toast({
+          title: "Validation Error",
+          description: err.errors[0].message,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    setIsResendingEmail(true);
+
+    try {
+      const { error } = await resendVerificationEmail(resendEmail);
+
+      if (error) throw error;
+
+      toast({
+        title: "Verification Email Sent",
+        description: "Check your inbox for the verification link.",
+      });
+      setShowResendEmail(false);
+      setResendEmail("");
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to resend verification email.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsResendingEmail(false);
     }
   };
 
@@ -261,6 +302,71 @@ const Auth = () => {
               variant="ghost"
               className="w-full mt-4"
               onClick={() => setShowForgotPassword(false)}
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (showResendEmail) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+        </div>
+
+        <Card className="w-full max-w-md relative z-10 bg-card/80 backdrop-blur-sm border-border">
+          <CardHeader className="text-center">
+            <div className="flex justify-center mb-4">
+              <Logo size="lg" />
+            </div>
+            <CardTitle className="text-2xl">Resend Verification Email</CardTitle>
+            <CardDescription>
+              Enter your email to receive a new verification link
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleResendEmail} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="resend-email">Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="resend-email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={resendEmail}
+                    onChange={(e) => setResendEmail(e.target.value)}
+                    className="pl-10"
+                    required
+                  />
+                </div>
+              </div>
+              <Button
+                type="submit"
+                className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                disabled={isResendingEmail}
+              >
+                {isResendingEmail ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  "Resend Verification Email"
+                )}
+              </Button>
+            </form>
+
+            <Button
+              variant="ghost"
+              className="w-full mt-4"
+              onClick={() => setShowResendEmail(false)}
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Login
@@ -360,6 +466,16 @@ const Auth = () => {
                 >
                   {isSubmitting ? "Logging in..." : "Login"}
                 </Button>
+                
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowResendEmail(true)}
+                    className="text-xs text-muted-foreground hover:text-primary hover:underline"
+                  >
+                    Didn't receive verification email?
+                  </button>
+                </div>
               </form>
             </TabsContent>
 
