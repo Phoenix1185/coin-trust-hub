@@ -112,6 +112,28 @@ interface ContactInfo {
   live_chat: string;
 }
 
+interface DemoFeedSettings {
+  enabled: boolean;
+  mode: "demo" | "real" | "mixed";
+  refresh_interval_seconds: number;
+  min_deposit_usd: number;
+  max_deposit_usd: number;
+  min_investment_usd: number;
+  max_investment_usd: number;
+  min_withdrawal_usd: number;
+  max_withdrawal_usd: number;
+  activity_types: string[];
+}
+
+interface LandingStats {
+  stat1_value: string;
+  stat1_label: string;
+  stat2_value: string;
+  stat2_label: string;
+  stat3_value: string;
+  stat3_label: string;
+}
+
 const Admin = () => {
   const { user, isAdmin, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -139,6 +161,26 @@ const Admin = () => {
     email: "support@bitcryptotradingco.com",
     phone: "+1 (888) 123-4567",
     live_chat: "Available 24/7",
+  });
+  const [demoFeedSettings, setDemoFeedSettings] = useState<DemoFeedSettings>({
+    enabled: true,
+    mode: "demo",
+    refresh_interval_seconds: 5,
+    min_deposit_usd: 100,
+    max_deposit_usd: 50000,
+    min_investment_usd: 500,
+    max_investment_usd: 25000,
+    min_withdrawal_usd: 200,
+    max_withdrawal_usd: 15000,
+    activity_types: ["deposit", "investment", "withdrawal"],
+  });
+  const [landingStats, setLandingStats] = useState<LandingStats>({
+    stat1_value: "$2.5B+",
+    stat1_label: "Assets Managed",
+    stat2_value: "150%",
+    stat2_label: "Avg. Returns",
+    stat3_value: "24/7",
+    stat3_label: "Support",
   });
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
@@ -195,6 +237,12 @@ const Admin = () => {
         settings.forEach((setting) => {
           if (setting.setting_key === "contact_info") {
             setContactInfo(setting.setting_value as unknown as ContactInfo);
+          }
+          if (setting.setting_key === "demo_feed_settings") {
+            setDemoFeedSettings(setting.setting_value as unknown as DemoFeedSettings);
+          }
+          if (setting.setting_key === "landing_stats") {
+            setLandingStats(setting.setting_value as unknown as LandingStats);
           }
         });
       }
@@ -503,26 +551,35 @@ const Admin = () => {
   const handleSaveSettings = async () => {
     setIsSavingSettings(true);
     try {
-      const { data: existing } = await supabase
-        .from("site_settings")
-        .select("id")
-        .eq("setting_key", "contact_info")
-        .single();
+      // Save all settings
+      const settingsToSave = [
+        { key: "contact_info", value: contactInfo },
+        { key: "demo_feed_settings", value: demoFeedSettings },
+        { key: "landing_stats", value: landingStats },
+      ];
 
-      if (existing) {
-        await supabase
+      for (const { key, value } of settingsToSave) {
+        const { data: existing } = await supabase
           .from("site_settings")
-          .update({ setting_value: JSON.parse(JSON.stringify(contactInfo)), updated_at: new Date().toISOString(), updated_by: user?.id })
-          .eq("setting_key", "contact_info");
-      } else {
-        await supabase.from("site_settings").insert({
-          setting_key: "contact_info",
-          setting_value: JSON.parse(JSON.stringify(contactInfo)),
-          updated_by: user?.id,
-        });
+          .select("id")
+          .eq("setting_key", key)
+          .single();
+
+        if (existing) {
+          await supabase
+            .from("site_settings")
+            .update({ setting_value: JSON.parse(JSON.stringify(value)), updated_at: new Date().toISOString(), updated_by: user?.id })
+            .eq("setting_key", key);
+        } else {
+          await supabase.from("site_settings").insert({
+            setting_key: key,
+            setting_value: JSON.parse(JSON.stringify(value)),
+            updated_by: user?.id,
+          });
+        }
       }
 
-      toast({ title: "Settings Saved", description: "Contact settings have been updated." });
+      toast({ title: "Settings Saved", description: "All settings have been updated." });
     } catch (error) {
       console.error("Error saving settings:", error);
       toast({ title: "Error", description: "Failed to save settings.", variant: "destructive" });
@@ -687,6 +744,7 @@ const Admin = () => {
             <TabsTrigger value="tickets" className="text-xs md:text-sm">Tickets</TabsTrigger>
             <TabsTrigger value="users" className="text-xs md:text-sm">Users</TabsTrigger>
             <TabsTrigger value="faqs" className="text-xs md:text-sm">FAQs</TabsTrigger>
+            <TabsTrigger value="activity" className="text-xs md:text-sm">Activity Feed</TabsTrigger>
             <TabsTrigger value="settings" className="text-xs md:text-sm">Settings</TabsTrigger>
           </TabsList>
 
@@ -965,9 +1023,228 @@ const Admin = () => {
             </Card>
           </TabsContent>
 
+          {/* Activity Feed Tab */}
+          <TabsContent value="activity">
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+                    <TrendingUp className="w-5 h-5 text-primary" />
+                    Demo Activity Feed Settings
+                  </CardTitle>
+                  <CardDescription>Control the live activity ticker on the landing page</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+                    <div>
+                      <Label className="text-base font-medium">Enable Demo Mode</Label>
+                      <p className="text-sm text-muted-foreground">Show simulated activity on the landing page</p>
+                    </div>
+                    <Switch
+                      checked={demoFeedSettings.enabled}
+                      onCheckedChange={(v) => setDemoFeedSettings({ ...demoFeedSettings, enabled: v })}
+                    />
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Mode</Label>
+                      <Select value={demoFeedSettings.mode} onValueChange={(v: "demo" | "real" | "mixed") => setDemoFeedSettings({ ...demoFeedSettings, mode: v })}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="demo">Demo Only</SelectItem>
+                          <SelectItem value="real">Real Only</SelectItem>
+                          <SelectItem value="mixed">Mixed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Refresh Interval (seconds)</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={60}
+                        value={demoFeedSettings.refresh_interval_seconds}
+                        onChange={(e) => setDemoFeedSettings({ ...demoFeedSettings, refresh_interval_seconds: parseInt(e.target.value) || 5 })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <Label className="text-base font-medium">Amount Ranges (USD)</Label>
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <div className="space-y-3 p-4 bg-success/5 border border-success/20 rounded-lg">
+                        <Label className="text-success">Deposits</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Min</Label>
+                            <Input
+                              type="number"
+                              value={demoFeedSettings.min_deposit_usd}
+                              onChange={(e) => setDemoFeedSettings({ ...demoFeedSettings, min_deposit_usd: parseInt(e.target.value) || 100 })}
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Max</Label>
+                            <Input
+                              type="number"
+                              value={demoFeedSettings.max_deposit_usd}
+                              onChange={(e) => setDemoFeedSettings({ ...demoFeedSettings, max_deposit_usd: parseInt(e.target.value) || 50000 })}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="space-y-3 p-4 bg-primary/5 border border-primary/20 rounded-lg">
+                        <Label className="text-primary">Investments</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Min</Label>
+                            <Input
+                              type="number"
+                              value={demoFeedSettings.min_investment_usd}
+                              onChange={(e) => setDemoFeedSettings({ ...demoFeedSettings, min_investment_usd: parseInt(e.target.value) || 500 })}
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Max</Label>
+                            <Input
+                              type="number"
+                              value={demoFeedSettings.max_investment_usd}
+                              onChange={(e) => setDemoFeedSettings({ ...demoFeedSettings, max_investment_usd: parseInt(e.target.value) || 25000 })}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="space-y-3 p-4 bg-warning/5 border border-warning/20 rounded-lg">
+                        <Label className="text-warning">Withdrawals</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Min</Label>
+                            <Input
+                              type="number"
+                              value={demoFeedSettings.min_withdrawal_usd}
+                              onChange={(e) => setDemoFeedSettings({ ...demoFeedSettings, min_withdrawal_usd: parseInt(e.target.value) || 200 })}
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Max</Label>
+                            <Input
+                              type="number"
+                              value={demoFeedSettings.max_withdrawal_usd}
+                              onChange={(e) => setDemoFeedSettings({ ...demoFeedSettings, max_withdrawal_usd: parseInt(e.target.value) || 15000 })}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Activity Types</Label>
+                    <div className="flex flex-wrap gap-4">
+                      {["deposit", "investment", "withdrawal"].map((type) => (
+                        <div key={type} className="flex items-center gap-2">
+                          <Switch
+                            checked={demoFeedSettings.activity_types.includes(type)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setDemoFeedSettings({ ...demoFeedSettings, activity_types: [...demoFeedSettings.activity_types, type] });
+                              } else {
+                                setDemoFeedSettings({ ...demoFeedSettings, activity_types: demoFeedSettings.activity_types.filter(t => t !== type) });
+                              }
+                            }}
+                          />
+                          <Label className="capitalize">{type}s</Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="flex justify-end">
+                <Button onClick={handleSaveSettings} disabled={isSavingSettings} className="bg-primary hover:bg-primary/90">
+                  <Save className="w-4 h-4 mr-2" />
+                  {isSavingSettings ? "Saving..." : "Save Activity Settings"}
+                </Button>
+              </div>
+            </div>
+          </TabsContent>
+
           {/* Settings Tab */}
           <TabsContent value="settings">
             <div className="space-y-6">
+              {/* Landing Page Stats Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+                    <TrendingUp className="w-5 h-5 text-primary" />
+                    Landing Page Statistics
+                  </CardTitle>
+                  <CardDescription>Edit the statistics shown on the landing page hero section</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
+                      <div className="space-y-2">
+                        <Label>Stat 1 Value</Label>
+                        <Input
+                          value={landingStats.stat1_value}
+                          onChange={(e) => setLandingStats({ ...landingStats, stat1_value: e.target.value })}
+                          placeholder="$2.5B+"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Stat 1 Label</Label>
+                        <Input
+                          value={landingStats.stat1_label}
+                          onChange={(e) => setLandingStats({ ...landingStats, stat1_label: e.target.value })}
+                          placeholder="Assets Managed"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
+                      <div className="space-y-2">
+                        <Label>Stat 2 Value</Label>
+                        <Input
+                          value={landingStats.stat2_value}
+                          onChange={(e) => setLandingStats({ ...landingStats, stat2_value: e.target.value })}
+                          placeholder="150%"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Stat 2 Label</Label>
+                        <Input
+                          value={landingStats.stat2_label}
+                          onChange={(e) => setLandingStats({ ...landingStats, stat2_label: e.target.value })}
+                          placeholder="Avg. Returns"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
+                      <div className="space-y-2">
+                        <Label>Stat 3 Value</Label>
+                        <Input
+                          value={landingStats.stat3_value}
+                          onChange={(e) => setLandingStats({ ...landingStats, stat3_value: e.target.value })}
+                          placeholder="24/7"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Stat 3 Label</Label>
+                        <Input
+                          value={landingStats.stat3_label}
+                          onChange={(e) => setLandingStats({ ...landingStats, stat3_label: e.target.value })}
+                          placeholder="Support"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg md:text-xl">

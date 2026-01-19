@@ -21,11 +21,28 @@ interface FAQ {
   answer: string;
 }
 
+interface LandingStats {
+  stat1_value: string;
+  stat1_label: string;
+  stat2_value: string;
+  stat2_label: string;
+  stat3_value: string;
+  stat3_label: string;
+}
+
 const Index = () => {
   const navigate = useNavigate();
   const { user, isLoading } = useAuth();
   const [isVisible, setIsVisible] = useState(false);
   const [faqs, setFaqs] = useState<FAQ[]>([]);
+  const [landingStats, setLandingStats] = useState<LandingStats>({
+    stat1_value: "$2.5B+",
+    stat1_label: "Assets Managed",
+    stat2_value: "150%",
+    stat2_label: "Avg. Returns",
+    stat3_value: "24/7",
+    stat3_label: "Support",
+  });
 
   useEffect(() => {
     if (user && !isLoading) {
@@ -36,7 +53,20 @@ const Index = () => {
   useEffect(() => {
     setIsVisible(true);
     fetchFAQs();
+    fetchLandingStats();
   }, []);
+
+  const fetchLandingStats = async () => {
+    const { data } = await supabase
+      .from("site_settings")
+      .select("setting_value")
+      .eq("setting_key", "landing_stats")
+      .single();
+    
+    if (data?.setting_value) {
+      setLandingStats(data.setting_value as unknown as LandingStats);
+    }
+  };
 
   const fetchFAQs = async () => {
     const { data } = await supabase
@@ -134,9 +164,9 @@ const Index = () => {
             {/* Stats */}
             <div className="grid grid-cols-3 gap-4 mt-16 max-w-lg mx-auto">
               {[
-                { value: "$2.5B+", label: "Assets Managed" },
-                { value: "150%", label: "Avg. Returns" },
-                { value: "24/7", label: "Support" },
+                { value: landingStats.stat1_value, label: landingStats.stat1_label },
+                { value: landingStats.stat2_value, label: landingStats.stat2_label },
+                { value: landingStats.stat3_value, label: landingStats.stat3_label },
               ].map((stat, i) => (
                 <div 
                   key={stat.label}
