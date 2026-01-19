@@ -37,3 +37,6 @@ verify_jwt = false
 
 [functions.exchange-rates]
 verify_jwt = false
+
+[functions.settlement-engine]
+verify_jwt = false
