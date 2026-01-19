@@ -67,7 +67,7 @@ interface User {
   user_id: string;
   email: string;
   full_name: string | null;
-  is_frozen: boolean;
+  is_frozen: boolean | null;
   created_at: string;
   phone: string | null;
   wallet_address: string | null;
@@ -122,16 +122,16 @@ interface FAQ {
   id: string;
   question: string;
   answer: string;
-  category: string;
-  display_order: number;
-  is_active: boolean;
+  category: string | null;
+  display_order: number | null;
+  is_active: boolean | null;
 }
 
 interface DepositAddress {
   id: string;
   address: string;
   label: string | null;
-  is_active: boolean;
+  is_active: boolean | null;
   created_at: string;
 }
 
@@ -143,7 +143,7 @@ interface InvestmentPlan {
   min_amount: number;
   max_amount: number;
   roi_percentage: number;
-  is_active: boolean;
+  is_active: boolean | null;
   created_at: string;
 }
 
@@ -166,10 +166,10 @@ interface AdminActivityLog {
 interface Notification {
   id: string;
   user_id: string;
-  type: string;
+  type: string | null;
   title: string;
   message: string;
-  is_read: boolean;
+  is_read: boolean | null;
   created_at: string;
 }
 
@@ -980,9 +980,9 @@ const Admin = () => {
     setFaqForm({
       question: faq.question,
       answer: faq.answer,
-      category: faq.category,
-      display_order: faq.display_order,
-      is_active: faq.is_active,
+      category: faq.category || "general",
+      display_order: faq.display_order ?? 0,
+      is_active: faq.is_active ?? true,
     });
     setFaqDialogOpen(true);
   };
@@ -1410,8 +1410,8 @@ const Admin = () => {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Switch checked={plan.is_active} onCheckedChange={() => handleTogglePlanActive(plan)} />
-                          <Button variant="ghost" size="icon" onClick={() => { setEditingPlan(plan); setPlanForm({ name: plan.name, description: plan.description || "", duration_days: plan.duration_days, min_amount: plan.min_amount, max_amount: plan.max_amount, roi_percentage: plan.roi_percentage, is_active: plan.is_active }); setPlanDialogOpen(true); }}>
+                          <Switch checked={plan.is_active ?? false} onCheckedChange={() => handleTogglePlanActive(plan)} />
+                          <Button variant="ghost" size="icon" onClick={() => { setEditingPlan(plan); setPlanForm({ name: plan.name, description: plan.description || "", duration_days: plan.duration_days, min_amount: plan.min_amount, max_amount: plan.max_amount, roi_percentage: plan.roi_percentage, is_active: plan.is_active ?? true }); setPlanDialogOpen(true); }}>
                             <Edit className="w-4 h-4" />
                           </Button>
                           <Button variant="ghost" size="icon" onClick={() => handleDeletePlan(plan.id)}>
@@ -1463,8 +1463,8 @@ const Admin = () => {
                           <Button variant="ghost" size="icon" onClick={() => { navigator.clipboard.writeText(addr.address); toast({ title: "Copied", description: "Address copied to clipboard." }); }}>
                             <Copy className="w-4 h-4" />
                           </Button>
-                          <Switch checked={addr.is_active} onCheckedChange={() => handleToggleAddressActive(addr)} />
-                          <Button variant="ghost" size="icon" onClick={() => { setEditingAddress(addr); setAddressForm({ address: addr.address, label: addr.label || "", is_active: addr.is_active }); setAddressDialogOpen(true); }}>
+                          <Switch checked={addr.is_active ?? false} onCheckedChange={() => handleToggleAddressActive(addr)} />
+                          <Button variant="ghost" size="icon" onClick={() => { setEditingAddress(addr); setAddressForm({ address: addr.address, label: addr.label || "", is_active: addr.is_active ?? true }); setAddressDialogOpen(true); }}>
                             <Edit className="w-4 h-4" />
                           </Button>
                           <Button variant="ghost" size="icon" onClick={() => handleDeleteAddress(addr.id)}>
@@ -1607,14 +1607,14 @@ const Admin = () => {
                           <div className="space-y-2 flex-1">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-medium">{faq.question}</span>
-                              {getCategoryBadge(faq.category)}
+                              {getCategoryBadge(faq.category || "general")}
                               {!faq.is_active && <Badge variant="secondary">Hidden</Badge>}
                             </div>
                             <p className="text-sm text-muted-foreground line-clamp-2">{faq.answer}</p>
-                            <p className="text-xs text-muted-foreground">Order: {faq.display_order}</p>
+                            <p className="text-xs text-muted-foreground">Order: {faq.display_order ?? 0}</p>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
-                            <Switch checked={faq.is_active} onCheckedChange={() => handleToggleFaqActive(faq)} />
+                            <Switch checked={faq.is_active ?? false} onCheckedChange={() => handleToggleFaqActive(faq)} />
                             <Button variant="ghost" size="icon" onClick={() => handleEditFaq(faq)}>
                               <Edit className="w-4 h-4" />
                             </Button>
@@ -1652,7 +1652,7 @@ const Admin = () => {
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
                               <span className="font-medium text-sm">{notif.title}</span>
-                              <Badge variant="outline" className="text-xs">{notif.type}</Badge>
+                              <Badge variant="outline" className="text-xs">{notif.type || "system"}</Badge>
                               {!notif.is_read && <Badge className="bg-primary text-xs">New</Badge>}
                             </div>
                             <p className="text-xs text-muted-foreground">{notif.message}</p>
