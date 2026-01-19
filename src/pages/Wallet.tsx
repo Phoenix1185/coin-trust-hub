@@ -19,9 +19,10 @@ interface Transaction {
 }
 
 const Wallet = () => {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, profile, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const { btcPrice, formatBTC, formatUSD, isLoading: priceLoading } = useBTCPrice();
+  const { btcPrice, formatBTC, btcToUSD, formatFiatAmount, isLoading: priceLoading } = useBTCPrice();
+  const currency = profile?.preferred_currency || "USD";
   const [balance, setBalance] = useState<number>(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -165,10 +166,10 @@ const Wallet = () => {
               ) : (
                 <>
                   <div className="text-3xl md:text-4xl font-bold text-gradient-gold">
-                    {formatBTC(balance)}
+                    {formatFiatAmount(btcToUSD(balance), currency)}
                   </div>
                   <div className="text-lg text-muted-foreground mt-1">
-                    {formatUSD(balance)}
+                    {formatBTC(balance)}
                   </div>
                 </>
               )}
@@ -264,10 +265,10 @@ const Wallet = () => {
                         tx.type === "withdrawal" ? "text-destructive" : ""
                       )}>
                         {tx.type === "deposit" ? "+" : tx.type === "withdrawal" ? "-" : ""}
-                        {formatBTC(tx.amount)}
+                        {formatFiatAmount(btcToUSD(tx.amount), currency)}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {formatUSD(tx.amount)}
+                        {formatBTC(tx.amount)}
                       </div>
                       <div className={cn("text-sm capitalize", getStatusColor(tx.status))}>
                         {tx.status}

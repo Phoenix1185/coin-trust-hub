@@ -27,10 +27,11 @@ interface Deposit {
 }
 
 const Deposit = () => {
-  const { user, isLoading } = useAuth();
+  const { user, profile, isLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { formatBTC, formatUSD, btcPrice } = useBTCPrice();
+  const { formatBTC, btcPrice, btcToUSD, usdToBTC, formatFiatAmount, getCurrencySymbol } = useBTCPrice();
+  const currency = profile?.preferred_currency || "USD";
   
   const [depositAddress, setDepositAddress] = useState<DepositAddress | null>(null);
   const [deposits, setDeposits] = useState<Deposit[]>([]);
@@ -106,8 +107,8 @@ const Deposit = () => {
       return;
     }
 
-    const amountNum = parseFloat(amount);
-    if (isNaN(amountNum) || amountNum <= 0) {
+    const fiatAmount = parseFloat(amount);
+    if (isNaN(fiatAmount) || fiatAmount <= 0) {
       toast({
         title: "Invalid Amount",
         description: "Please enter a valid amount",
@@ -116,11 +117,16 @@ const Deposit = () => {
       return;
     }
 
+    // Convert fiat to BTC for storage
+    const exchangeRate = currency === "USD" ? 1 : currency === "EUR" ? 0.92 : 0.79;
+    const usdAmount = fiatAmount / exchangeRate;
+    const btcAmount = usdToBTC(usdAmount);
+
     setIsSubmitting(true);
 
     const { error } = await supabase.from("deposits").insert({
       user_id: user.id,
-      amount: amountNum,
+      amount: btcAmount,
       txid: txid || null,
       status: "pending",
     });
@@ -251,19 +257,25 @@ const Deposit = () => {
             <CardContent>
               <form onSubmit={handleSubmitDeposit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="amount">Amount (BTC)</Label>
-                  <Input
-                    id="amount"
-                    type="number"
-                    step="0.00000001"
-                    placeholder="0.00000000"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    required
-                  />
+                  <Label htmlFor="amount">Amount ({currency})</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                      {getCurrencySymbol(currency)}
+                    </span>
+                    <Input
+                      id="amount"
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      className="pl-8"
+                      required
+                    />
+                  </div>
                   {amount && parseFloat(amount) > 0 && (
                     <p className="text-xs text-muted-foreground">
-                      ≈ {formatUSD(parseFloat(amount))} (1 BTC = ${btcPrice.toLocaleString()})
+                      ≈ {formatBTC(usdToBTC(parseFloat(amount) / (currency === "USD" ? 1 : currency === "EUR" ? 0.92 : 0.79)))} (1 BTC = {formatFiatAmount(btcPrice, currency)})
                     </p>
                   )}
                 </div>
@@ -310,8 +322,8 @@ const Deposit = () => {
                     className="flex items-center justify-between p-4 bg-muted/50 rounded-lg"
                   >
                     <div>
-                      <p className="font-medium">{formatBTC(deposit.amount)}</p>
-                      <p className="text-xs text-muted-foreground">{formatUSD(deposit.amount)}</p>
+                      <p className="font-medium">{formatFiatAmount(btcToUSD(deposit.amount), currency)}</p>
+                      <p className="text-xs text-muted-foreground">{formatBTC(deposit.amount)}</p>
                       <p className="text-sm text-muted-foreground">
                         {formatDate(deposit.created_at)}
                       </p>

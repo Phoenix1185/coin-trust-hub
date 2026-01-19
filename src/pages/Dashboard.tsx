@@ -40,7 +40,8 @@ interface RecentActivity {
 const Dashboard = () => {
   const { user, profile, isLoading } = useAuth();
   const navigate = useNavigate();
-  const { formatBTC, formatUSD } = useBTCPrice();
+  const { formatBTC, formatWithBTC, btcToUSD, formatFiatAmount } = useBTCPrice();
+  const currency = profile?.preferred_currency || "USD";
   
   const displayName = profile?.full_name || user?.email?.split("@")[0] || "User";
   
@@ -197,8 +198,8 @@ const Dashboard = () => {
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-muted-foreground">Available Balance</p>
-                  <p className="text-base sm:text-lg font-bold text-primary truncate">{formatBTC(stats.balance)}</p>
-                  <p className="text-xs text-muted-foreground">{formatUSD(stats.balance)}</p>
+                  <p className="text-base sm:text-lg font-bold text-primary truncate">{formatFiatAmount(btcToUSD(stats.balance), currency)}</p>
+                  <p className="text-xs text-muted-foreground">{formatBTC(stats.balance)}</p>
                 </div>
                 <div className="p-2 bg-primary/20 rounded-full ml-2">
                   <Wallet className="w-5 h-5 text-primary" />
@@ -212,7 +213,8 @@ const Dashboard = () => {
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-muted-foreground">Total Deposits</p>
-                  <p className="text-base sm:text-lg font-bold truncate">{formatBTC(stats.totalDeposits)}</p>
+                  <p className="text-base sm:text-lg font-bold truncate">{formatFiatAmount(btcToUSD(stats.totalDeposits), currency)}</p>
+                  <p className="text-xs text-muted-foreground">{formatBTC(stats.totalDeposits)}</p>
                   {stats.pendingDeposits > 0 && (
                     <p className="text-xs text-warning">{stats.pendingDeposits} pending</p>
                   )}
@@ -229,7 +231,8 @@ const Dashboard = () => {
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-muted-foreground">Total Withdrawals</p>
-                  <p className="text-base sm:text-lg font-bold truncate">{formatBTC(stats.totalWithdrawals)}</p>
+                  <p className="text-base sm:text-lg font-bold truncate">{formatFiatAmount(btcToUSD(stats.totalWithdrawals), currency)}</p>
+                  <p className="text-xs text-muted-foreground">{formatBTC(stats.totalWithdrawals)}</p>
                   {stats.pendingWithdrawals > 0 && (
                     <p className="text-xs text-warning">{stats.pendingWithdrawals} pending</p>
                   )}
@@ -346,7 +349,7 @@ const Dashboard = () => {
                       <div className="min-w-0">
                         <p className="font-medium capitalize text-sm">{activity.type}</p>
                         <p className="text-xs text-muted-foreground truncate">
-                          {formatBTC(activity.amount)}
+                          {formatFiatAmount(btcToUSD(activity.amount), currency)} ({formatBTC(activity.amount)})
                         </p>
                       </div>
                     </div>
