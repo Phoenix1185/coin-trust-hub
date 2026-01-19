@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useBTCPrice } from "@/hooks/useBTCPrice";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ const Withdraw = () => {
   const { user, isLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { formatBTC, formatUSD, btcPrice } = useBTCPrice();
   
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [settings, setSettings] = useState<WithdrawalSettings | null>(null);
@@ -296,9 +298,14 @@ const Withdraw = () => {
                 </div>
                 <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                   <span className="text-sm">Available Balance</span>
-                  <span className="text-sm font-mono text-primary">
-                    {balance.toFixed(8)} BTC
-                  </span>
+                  <div className="text-right">
+                    <span className="text-sm font-mono text-primary block">
+                      {formatBTC(balance)}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {formatUSD(balance)}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -338,8 +345,13 @@ const Withdraw = () => {
                     required
                   />
                   <p className="text-xs text-muted-foreground">
-                    Available: {balance.toFixed(8)} BTC
+                    Available: {formatBTC(balance)} ({formatUSD(balance)})
                   </p>
+                  {amount && parseFloat(amount) > 0 && (
+                    <p className="text-xs text-primary">
+                      ≈ {formatUSD(parseFloat(amount))} (1 BTC = ${btcPrice.toLocaleString()})
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="wallet">BTC Wallet Address</Label>
@@ -382,7 +394,8 @@ const Withdraw = () => {
                     className="flex items-center justify-between p-4 bg-muted/50 rounded-lg"
                   >
                     <div>
-                      <p className="font-medium">{withdrawal.amount.toFixed(8)} BTC</p>
+                      <p className="font-medium">{formatBTC(withdrawal.amount)}</p>
+                      <p className="text-xs text-muted-foreground">{formatUSD(withdrawal.amount)}</p>
                       <p className="text-sm text-muted-foreground">
                         {formatDate(withdrawal.created_at)}
                       </p>
