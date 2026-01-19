@@ -4,20 +4,50 @@ import Logo from "@/components/Logo";
 import CryptoChart from "@/components/CryptoChart";
 import LiveTicker from "@/components/LiveTicker";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Shield, TrendingUp, Users, Zap, Lock, Globe, ChevronDown } from "lucide-react";
+import { ArrowRight, Shield, TrendingUp, Users, Zap, Lock, Globe, ChevronDown, HelpCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+
+interface FAQ {
+  id: string;
+  question: string;
+  answer: string;
+}
 
 const Index = () => {
   const navigate = useNavigate();
   const { user, isLoading } = useAuth();
   const [isVisible, setIsVisible] = useState(false);
+  const [faqs, setFaqs] = useState<FAQ[]>([]);
 
   useEffect(() => {
     if (user && !isLoading) {
       navigate("/dashboard");
     }
   }, [user, isLoading, navigate]);
+
+  useEffect(() => {
+    setIsVisible(true);
+    fetchFAQs();
+  }, []);
+
+  const fetchFAQs = async () => {
+    const { data } = await supabase
+      .from("faqs")
+      .select("id, question, answer")
+      .eq("is_active", true)
+      .order("display_order", { ascending: true })
+      .limit(5);
+    
+    if (data) setFaqs(data);
+  };
 
   useEffect(() => {
     setIsVisible(true);
@@ -176,6 +206,49 @@ const Index = () => {
         </div>
       </section>
 
+      {/* FAQ Section */}
+      {faqs.length > 0 && (
+        <section className="py-20 relative z-10">
+          <div className="container mx-auto px-4">
+            <div className="max-w-3xl mx-auto">
+              <div className="text-center mb-12">
+                <div className="inline-flex items-center justify-center w-12 h-12 bg-primary/10 rounded-full mb-4">
+                  <HelpCircle className="w-6 h-6 text-primary" />
+                </div>
+                <h2 className="text-3xl md:text-4xl font-bold mb-4">
+                  Frequently Asked Questions
+                </h2>
+                <p className="text-muted-foreground">
+                  Get answers to common questions about our platform
+                </p>
+              </div>
+              
+              <Accordion type="single" collapsible className="w-full">
+                {faqs.map((faq) => (
+                  <AccordionItem key={faq.id} value={faq.id} className="border-border">
+                    <AccordionTrigger className="text-left hover:no-underline hover:text-primary">
+                      {faq.question}
+                    </AccordionTrigger>
+                    <AccordionContent className="text-muted-foreground">
+                      {faq.answer}
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+
+              <div className="text-center mt-8">
+                <Link to="/faq">
+                  <Button variant="outline" size="lg">
+                    View All FAQs
+                    <ArrowRight className="ml-2 w-4 h-4" />
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* CTA Section */}
       <section className="py-20 relative z-10">
         <div className="container mx-auto px-4">
@@ -208,6 +281,9 @@ const Index = () => {
             <div className="flex flex-col md:flex-row items-center justify-between gap-4">
               <Logo size="sm" />
               <div className="flex flex-wrap justify-center gap-4 text-sm">
+                <Link to="/faq" className="text-muted-foreground hover:text-primary transition-colors">
+                  FAQ
+                </Link>
                 <Link to="/terms-of-service" className="text-muted-foreground hover:text-primary transition-colors">
                   Terms of Service
                 </Link>
