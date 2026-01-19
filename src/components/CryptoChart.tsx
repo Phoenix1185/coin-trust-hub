@@ -159,16 +159,16 @@ export const CryptoChart = ({ className, showDetails = true }: CryptoChartProps)
   const maxPrice = Math.max(...sparklineData);
 
   return (
-    <div className={cn("bg-card border border-border rounded-xl p-4 md:p-6", className)}>
+    <div className={cn("bg-card border border-border rounded-xl p-3 sm:p-4 md:p-6", className)}>
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 md:mb-6 gap-3">
-        <div className="flex items-center gap-2 md:gap-4">
+      <div className="flex items-center justify-between mb-3 sm:mb-4">
+        <div className="flex items-center gap-2">
           {cryptoData.map((crypto) => (
             <button
               key={crypto.symbol}
               onClick={() => setSelectedCrypto(crypto.symbol)}
               className={cn(
-                "px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition-colors",
+                "px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-medium transition-colors",
                 selectedCrypto === crypto.symbol
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
@@ -177,32 +177,34 @@ export const CryptoChart = ({ className, showDetails = true }: CryptoChartProps)
               {crypto.symbol}
             </button>
           ))}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="ml-auto md:ml-0"
-          >
-            <RefreshCw className={cn("w-4 h-4", isRefreshing && "animate-spin")} />
-          </Button>
         </div>
-        <div className="text-left md:text-right">
-          <div className="text-xl md:text-2xl font-bold">{formatPrice(selectedData?.price || 0)}</div>
-          <div className={cn(
-            "flex items-center gap-1 text-sm",
-            isPositive ? "text-success" : "text-destructive"
-          )}>
-            {isPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-            {isPositive ? "+" : ""}{selectedData?.change24h?.toFixed(2)}% (24h)
-          </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className="h-8 w-8"
+        >
+          <RefreshCw className={cn("w-4 h-4", isRefreshing && "animate-spin")} />
+        </Button>
+      </div>
+      
+      {/* Price Display */}
+      <div className="mb-3">
+        <div className="text-lg sm:text-xl font-bold">{formatPrice(selectedData?.price || 0)}</div>
+        <div className={cn(
+          "flex items-center gap-1 text-xs sm:text-sm",
+          isPositive ? "text-success" : "text-destructive"
+        )}>
+          {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+          {isPositive ? "+" : ""}{selectedData?.change24h?.toFixed(2)}% (24h)
         </div>
       </div>
 
       {/* Chart */}
-      <div className="h-48 md:h-64">
+      <div className="h-32 sm:h-40 md:h-48">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+          <AreaChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
@@ -219,9 +221,9 @@ export const CryptoChart = ({ className, showDetails = true }: CryptoChartProps)
               dataKey="time" 
               axisLine={false}
               tickLine={false}
-              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
+              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 9 }}
               tickFormatter={(value) => value % 24 === 0 ? `${Math.floor(value / 24)}d` : ''}
-              interval={23}
+              interval={47}
             />
             <YAxis 
               hide 
@@ -234,9 +236,10 @@ export const CryptoChart = ({ className, showDetails = true }: CryptoChartProps)
                 borderRadius: "8px",
                 color: "hsl(var(--foreground))",
                 boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                fontSize: "12px",
               }}
               formatter={(value: number) => [formatPrice(value), "Price"]}
-              labelFormatter={(label) => `${Math.floor(label / 24)} days, ${label % 24} hours ago`}
+              labelFormatter={(label) => `${Math.floor(label / 24)}d ${label % 24}h ago`}
             />
             <Area
               type="monotone"
@@ -245,7 +248,7 @@ export const CryptoChart = ({ className, showDetails = true }: CryptoChartProps)
               strokeWidth={2}
               fill="url(#colorPrice)"
               dot={false}
-              activeDot={{ r: 4, fill: "hsl(var(--primary))" }}
+              activeDot={{ r: 3, fill: "hsl(var(--primary))" }}
             />
           </AreaChart>
         </ResponsiveContainer>
@@ -253,14 +256,14 @@ export const CryptoChart = ({ className, showDetails = true }: CryptoChartProps)
 
       {/* Stats */}
       {showDetails && selectedData && (
-        <div className="grid grid-cols-2 gap-4 mt-4 md:mt-6 pt-4 md:pt-6 border-t border-border">
+        <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-border">
           <div>
-            <div className="text-xs md:text-sm text-muted-foreground">Market Cap</div>
-            <div className="font-semibold text-sm md:text-base">{formatMarketCap(selectedData.marketCap)}</div>
+            <div className="text-xs text-muted-foreground">Market Cap</div>
+            <div className="font-semibold text-sm">{formatMarketCap(selectedData.marketCap)}</div>
           </div>
           <div>
-            <div className="text-xs md:text-sm text-muted-foreground">24h Volume</div>
-            <div className="font-semibold text-sm md:text-base">{formatMarketCap(selectedData.volume24h)}</div>
+            <div className="text-xs text-muted-foreground">24h Volume</div>
+            <div className="font-semibold text-sm">{formatMarketCap(selectedData.volume24h)}</div>
           </div>
         </div>
       )}
