@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -37,6 +39,8 @@ import {
   Plus,
   Trash2,
   Reply,
+  HelpCircle,
+  Edit,
 } from "lucide-react";
 
 interface User {
@@ -93,9 +97,13 @@ interface SupportTicket {
   profiles?: { email: string; full_name: string | null };
 }
 
-interface FAQItem {
+interface FAQ {
+  id: string;
   question: string;
   answer: string;
+  category: string;
+  display_order: number;
+  is_active: boolean;
 }
 
 interface ContactInfo {
@@ -116,6 +124,7 @@ const Admin = () => {
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [investments, setInvestments] = useState<Investment[]>([]);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [faqs, setFaqs] = useState<FAQ[]>([]);
   const [stats, setStats] = useState({
     totalUsers: 0,
     pendingDeposits: 0,
@@ -126,13 +135,17 @@ const Admin = () => {
   });
 
   // Settings state
-  const [faqItems, setFaqItems] = useState<FAQItem[]>([]);
   const [contactInfo, setContactInfo] = useState<ContactInfo>({
     email: "support@bitcryptotradingco.com",
     phone: "+1 (888) 123-4567",
     live_chat: "Available 24/7",
   });
   const [isSavingSettings, setIsSavingSettings] = useState(false);
+
+  // FAQ dialog state
+  const [faqDialogOpen, setFaqDialogOpen] = useState(false);
+  const [editingFaq, setEditingFaq] = useState<FAQ | null>(null);
+  const [faqForm, setFaqForm] = useState({ question: "", answer: "", category: "general", display_order: 0, is_active: true });
 
   // Ticket reply state
   const [replyDialogOpen, setReplyDialogOpen] = useState(false);
@@ -159,8 +172,18 @@ const Admin = () => {
     if (user && isAdmin) {
       fetchAllData();
       fetchSiteSettings();
+      fetchFAQs();
     }
   }, [user, isAdmin]);
+
+  const fetchFAQs = async () => {
+    const { data } = await supabase
+      .from("faqs")
+      .select("*")
+      .order("display_order", { ascending: true });
+    
+    if (data) setFaqs(data);
+  };
 
   const fetchSiteSettings = async () => {
     try {
@@ -172,9 +195,6 @@ const Admin = () => {
         settings.forEach((setting) => {
           if (setting.setting_key === "contact_info") {
             setContactInfo(setting.setting_value as unknown as ContactInfo);
-          }
-          if (setting.setting_key === "faq_items") {
-            setFaqItems(setting.setting_value as unknown as FAQItem[]);
           }
         });
       }
@@ -242,12 +262,6 @@ const Admin = () => {
 
       if (error) throw error;
 
-      await supabase.from("notifications").insert({
-        user_id: deposit.user_id,
-        title: "Deposit Approved",
-        message: `Your deposit of ${deposit.amount.toFixed(4)} BTC has been approved and added to your balance.`,
-      });
-
       toast({ title: "Deposit Approved", description: `${deposit.amount.toFixed(4)} BTC approved successfully.` });
       fetchAllData();
     } catch (error) {
@@ -268,12 +282,6 @@ const Admin = () => {
         .eq("id", deposit.id);
 
       if (error) throw error;
-
-      await supabase.from("notifications").insert({
-        user_id: deposit.user_id,
-        title: "Deposit Declined",
-        message: `Your deposit of ${deposit.amount.toFixed(4)} BTC has been declined. Please contact support for more information.`,
-      });
 
       toast({ title: "Deposit Declined", description: "Deposit has been declined." });
       fetchAllData();
@@ -302,12 +310,6 @@ const Admin = () => {
 
       if (error) throw error;
 
-      await supabase.from("notifications").insert({
-        user_id: withdrawal.user_id,
-        title: "Withdrawal Approved",
-        message: `Your withdrawal of ${withdrawal.amount.toFixed(4)} BTC has been processed. TXID: ${txid}`,
-      });
-
       toast({ title: "Withdrawal Approved", description: `${withdrawal.amount.toFixed(4)} BTC sent successfully.` });
       fetchAllData();
     } catch (error) {
@@ -329,12 +331,6 @@ const Admin = () => {
         .eq("id", withdrawal.id);
 
       if (error) throw error;
-
-      await supabase.from("notifications").insert({
-        user_id: withdrawal.user_id,
-        title: "Withdrawal Declined",
-        message: `Your withdrawal of ${withdrawal.amount.toFixed(4)} BTC has been declined. Reason: ${reason || "Contact support for details."}`,
-      });
 
       toast({ title: "Withdrawal Declined", description: "Withdrawal has been declined." });
       fetchAllData();
@@ -372,12 +368,6 @@ const Admin = () => {
 
       if (error) throw error;
 
-      await supabase.from("notifications").insert({
-        user_id: investment.user_id,
-        title: "Investment Activated",
-        message: `Your investment of ${investment.amount.toFixed(4)} BTC has been activated. Expected return: ${expectedReturn.toFixed(4)} BTC.`,
-      });
-
       toast({ title: "Investment Activated", description: "Investment is now active." });
       fetchAllData();
     } catch (error) {
@@ -391,6 +381,15 @@ const Admin = () => {
 
     setIsReplying(true);
     try {
+      // Insert message into support_ticket_messages
+      await supabase.from("support_ticket_messages").insert({
+        ticket_id: selectedTicket.id,
+        sender_id: user?.id,
+        sender_type: "admin",
+        message: replyMessage,
+      });
+
+      // Update ticket status
       const { error } = await supabase
         .from("support_tickets")
         .update({
@@ -405,6 +404,7 @@ const Admin = () => {
 
       await supabase.from("notifications").insert({
         user_id: selectedTicket.user_id,
+        type: "system",
         title: "Support Ticket Replied",
         message: `Your support ticket "${selectedTicket.subject}" has received a response.`,
       });
@@ -422,46 +422,113 @@ const Admin = () => {
     }
   };
 
+  // FAQ CRUD operations
+  const handleSaveFaq = async () => {
+    try {
+      if (editingFaq) {
+        const { error } = await supabase
+          .from("faqs")
+          .update({
+            question: faqForm.question,
+            answer: faqForm.answer,
+            category: faqForm.category,
+            display_order: faqForm.display_order,
+            is_active: faqForm.is_active,
+          })
+          .eq("id", editingFaq.id);
+
+        if (error) throw error;
+        toast({ title: "FAQ Updated", description: "FAQ has been updated successfully." });
+      } else {
+        const { error } = await supabase.from("faqs").insert({
+          question: faqForm.question,
+          answer: faqForm.answer,
+          category: faqForm.category,
+          display_order: faqForm.display_order,
+          is_active: faqForm.is_active,
+        });
+
+        if (error) throw error;
+        toast({ title: "FAQ Created", description: "New FAQ has been created." });
+      }
+
+      setFaqDialogOpen(false);
+      setEditingFaq(null);
+      setFaqForm({ question: "", answer: "", category: "general", display_order: 0, is_active: true });
+      fetchFAQs();
+    } catch (error) {
+      console.error("Error saving FAQ:", error);
+      toast({ title: "Error", description: "Failed to save FAQ.", variant: "destructive" });
+    }
+  };
+
+  const handleEditFaq = (faq: FAQ) => {
+    setEditingFaq(faq);
+    setFaqForm({
+      question: faq.question,
+      answer: faq.answer,
+      category: faq.category,
+      display_order: faq.display_order,
+      is_active: faq.is_active,
+    });
+    setFaqDialogOpen(true);
+  };
+
+  const handleDeleteFaq = async (id: string) => {
+    try {
+      const { error } = await supabase.from("faqs").delete().eq("id", id);
+      if (error) throw error;
+      toast({ title: "FAQ Deleted", description: "FAQ has been deleted." });
+      fetchFAQs();
+    } catch (error) {
+      console.error("Error deleting FAQ:", error);
+      toast({ title: "Error", description: "Failed to delete FAQ.", variant: "destructive" });
+    }
+  };
+
+  const handleToggleFaqActive = async (faq: FAQ) => {
+    try {
+      const { error } = await supabase
+        .from("faqs")
+        .update({ is_active: !faq.is_active })
+        .eq("id", faq.id);
+
+      if (error) throw error;
+      fetchFAQs();
+    } catch (error) {
+      console.error("Error toggling FAQ:", error);
+    }
+  };
+
   const handleSaveSettings = async () => {
     setIsSavingSettings(true);
     try {
-      // Update contact info
-      const { error: contactError } = await supabase
+      const { data: existing } = await supabase
         .from("site_settings")
-        .update({ setting_value: JSON.parse(JSON.stringify(contactInfo)), updated_at: new Date().toISOString(), updated_by: user?.id })
-        .eq("setting_key", "contact_info");
+        .select("id")
+        .eq("setting_key", "contact_info")
+        .single();
 
-      if (contactError) throw contactError;
+      if (existing) {
+        await supabase
+          .from("site_settings")
+          .update({ setting_value: JSON.parse(JSON.stringify(contactInfo)), updated_at: new Date().toISOString(), updated_by: user?.id })
+          .eq("setting_key", "contact_info");
+      } else {
+        await supabase.from("site_settings").insert({
+          setting_key: "contact_info",
+          setting_value: JSON.parse(JSON.stringify(contactInfo)),
+          updated_by: user?.id,
+        });
+      }
 
-      // Update FAQ items
-      const { error: faqError } = await supabase
-        .from("site_settings")
-        .update({ setting_value: JSON.parse(JSON.stringify(faqItems)), updated_at: new Date().toISOString(), updated_by: user?.id })
-        .eq("setting_key", "faq_items");
-
-      if (faqError) throw faqError;
-
-      toast({ title: "Settings Saved", description: "Site settings have been updated." });
+      toast({ title: "Settings Saved", description: "Contact settings have been updated." });
     } catch (error) {
       console.error("Error saving settings:", error);
       toast({ title: "Error", description: "Failed to save settings.", variant: "destructive" });
     } finally {
       setIsSavingSettings(false);
     }
-  };
-
-  const addFAQItem = () => {
-    setFaqItems([...faqItems, { question: "", answer: "" }]);
-  };
-
-  const removeFAQItem = (index: number) => {
-    setFaqItems(faqItems.filter((_, i) => i !== index));
-  };
-
-  const updateFAQItem = (index: number, field: "question" | "answer", value: string) => {
-    const updated = [...faqItems];
-    updated[index][field] = value;
-    setFaqItems(updated);
   };
 
   const formatCurrency = (amount: number) => `${amount.toFixed(4)} BTC`;
@@ -493,6 +560,17 @@ const Admin = () => {
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
+  };
+
+  const getCategoryBadge = (category: string) => {
+    const colors: Record<string, string> = {
+      general: "bg-primary/10 text-primary",
+      investments: "bg-success/10 text-success",
+      deposits: "bg-success/10 text-success",
+      withdrawals: "bg-warning/10 text-warning",
+      security: "bg-destructive/10 text-destructive",
+    };
+    return <Badge className={colors[category] || "bg-muted text-muted-foreground"}>{category}</Badge>;
   };
 
   if (authLoading || (!isAdmin && user)) {
@@ -602,12 +680,13 @@ const Admin = () => {
 
         {/* Tabs */}
         <Tabs defaultValue="deposits" className="space-y-4">
-          <TabsList className="grid grid-cols-3 md:grid-cols-6 w-full">
+          <TabsList className="flex flex-wrap h-auto gap-1">
             <TabsTrigger value="deposits" className="text-xs md:text-sm">Deposits</TabsTrigger>
             <TabsTrigger value="withdrawals" className="text-xs md:text-sm">Withdrawals</TabsTrigger>
             <TabsTrigger value="investments" className="text-xs md:text-sm">Investments</TabsTrigger>
             <TabsTrigger value="tickets" className="text-xs md:text-sm">Tickets</TabsTrigger>
             <TabsTrigger value="users" className="text-xs md:text-sm">Users</TabsTrigger>
+            <TabsTrigger value="faqs" className="text-xs md:text-sm">FAQs</TabsTrigger>
             <TabsTrigger value="settings" className="text-xs md:text-sm">Settings</TabsTrigger>
           </TabsList>
 
@@ -699,9 +778,9 @@ const Admin = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
                   <TrendingUp className="w-5 h-5 text-primary" />
-                  User Investments
+                  Investments
                 </CardTitle>
-                <CardDescription>Manage and activate user investments</CardDescription>
+                <CardDescription>Manage user investments</CardDescription>
               </CardHeader>
               <CardContent>
                 {isLoading ? (
@@ -709,19 +788,16 @@ const Admin = () => {
                 ) : investments.length === 0 ? (
                   <p className="text-center py-8 text-muted-foreground">No investments</p>
                 ) : (
-                  <div className="space-y-3 md:space-y-4">
+                  <div className="space-y-3">
                     {investments.map((investment) => (
-                      <div key={investment.id} className="flex flex-col md:flex-row md:items-center justify-between p-3 md:p-4 bg-muted/30 rounded-lg gap-3 md:gap-4">
+                      <div key={investment.id} className="flex flex-col md:flex-row md:items-center justify-between p-3 md:p-4 bg-muted/30 rounded-lg gap-3">
                         <div className="space-y-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium text-sm md:text-base">{investment.profiles?.email || "Unknown"}</span>
                             {getStatusBadge(investment.status)}
                           </div>
                           <p className="text-sm text-muted-foreground">
-                            Plan: <span className="font-medium">{investment.investment_plans?.name || "Unknown"}</span>
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Amount: <span className="text-primary font-semibold">{formatCurrency(investment.amount)}</span>
+                            Plan: {investment.investment_plans?.name} | Amount: <span className="text-primary font-semibold">{formatCurrency(investment.amount)}</span>
                           </p>
                           <p className="text-xs text-muted-foreground">{formatDate(investment.created_at)}</p>
                         </div>
@@ -746,7 +822,7 @@ const Admin = () => {
                   <MessageSquare className="w-5 h-5 text-primary" />
                   Support Tickets
                 </CardTitle>
-                <CardDescription>Respond to user support requests</CardDescription>
+                <CardDescription>View and respond to support tickets</CardDescription>
               </CardHeader>
               <CardContent>
                 {isLoading ? (
@@ -754,16 +830,16 @@ const Admin = () => {
                 ) : tickets.length === 0 ? (
                   <p className="text-center py-8 text-muted-foreground">No support tickets</p>
                 ) : (
-                  <div className="space-y-3 md:space-y-4">
+                  <div className="space-y-4">
                     {tickets.map((ticket) => (
-                      <div key={ticket.id} className="p-3 md:p-4 bg-muted/30 rounded-lg space-y-3">
-                        <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
-                          <div className="space-y-1 min-w-0">
+                      <div key={ticket.id} className="p-4 bg-muted/30 rounded-lg space-y-3">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                          <div className="space-y-1">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-medium text-sm md:text-base truncate">{ticket.subject}</span>
+                              <span className="font-medium">{ticket.subject}</span>
                               {getStatusBadge(ticket.status)}
                             </div>
-                            <p className="text-xs md:text-sm text-muted-foreground">{ticket.profiles?.email || "Unknown"}</p>
+                            <p className="text-sm text-muted-foreground">{ticket.profiles?.email || "Unknown"}</p>
                             <p className="text-xs text-muted-foreground">{formatDate(ticket.created_at)}</p>
                           </div>
                           {ticket.status === "open" && (
@@ -778,12 +854,10 @@ const Admin = () => {
                             </Button>
                           )}
                         </div>
-                        <div className="bg-muted/50 p-3 rounded-lg">
-                          <p className="text-sm">{ticket.message}</p>
-                        </div>
+                        <p className="text-sm bg-card p-3 rounded">{ticket.message}</p>
                         {ticket.response && (
-                          <div className="bg-success/10 border border-success/20 p-3 rounded-lg">
-                            <p className="text-xs font-medium text-success mb-1">Your Response:</p>
+                          <div className="bg-primary/10 p-3 rounded">
+                            <p className="text-xs font-medium text-primary mb-1">Admin Response:</p>
                             <p className="text-sm">{ticket.response}</p>
                           </div>
                         )}
@@ -801,39 +875,90 @@ const Admin = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
                   <Users className="w-5 h-5 text-primary" />
-                  All Users
+                  Users
                 </CardTitle>
-                <CardDescription>View registered users</CardDescription>
+                <CardDescription>Manage registered users</CardDescription>
               </CardHeader>
               <CardContent>
                 {isLoading ? (
-                  <div className="space-y-4">{[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-16" />)}</div>
+                  <div className="space-y-4">{[1, 2, 3].map((i) => <Skeleton key={i} className="h-16" />)}</div>
                 ) : users.length === 0 ? (
-                  <p className="text-center py-8 text-muted-foreground">No users found</p>
+                  <p className="text-center py-8 text-muted-foreground">No users</p>
                 ) : (
                   <div className="space-y-3">
-                    {users
-                      .filter((u) =>
-                        u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        u.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
-                      )
-                      .map((u) => (
-                        <div key={u.id} className="flex items-center justify-between p-3 md:p-4 bg-muted/30 rounded-lg">
-                          <div className="flex items-center gap-3 md:gap-4 min-w-0">
-                            <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                              <span className="text-primary font-medium text-sm md:text-base">{u.email[0].toUpperCase()}</span>
+                    {users.filter(u => u.email.toLowerCase().includes(searchTerm.toLowerCase())).map((u) => (
+                      <div key={u.id} className="flex flex-col md:flex-row md:items-center justify-between p-3 bg-muted/30 rounded-lg gap-2">
+                        <div className="space-y-1">
+                          <p className="font-medium text-sm md:text-base">{u.full_name || u.email}</p>
+                          <p className="text-xs text-muted-foreground">{u.email}</p>
+                          <p className="text-xs text-muted-foreground">Joined: {formatDate(u.created_at)}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {u.is_frozen && <Badge variant="destructive">Frozen</Badge>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* FAQs Tab */}
+          <TabsContent value="faqs">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+                      <HelpCircle className="w-5 h-5 text-primary" />
+                      FAQ Management
+                    </CardTitle>
+                    <CardDescription>Manage frequently asked questions</CardDescription>
+                  </div>
+                  <Button
+                    onClick={() => {
+                      setEditingFaq(null);
+                      setFaqForm({ question: "", answer: "", category: "general", display_order: faqs.length + 1, is_active: true });
+                      setFaqDialogOpen(true);
+                    }}
+                  >
+                    <Plus className="w-4 h-4 mr-1" />Add FAQ
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {faqs.length === 0 ? (
+                  <p className="text-center py-8 text-muted-foreground">No FAQs. Click "Add FAQ" to create one.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {faqs.map((faq) => (
+                      <div key={faq.id} className="p-4 bg-muted/30 rounded-lg">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 space-y-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-medium">{faq.question}</span>
+                              {getCategoryBadge(faq.category)}
+                              {!faq.is_active && <Badge variant="secondary">Hidden</Badge>}
                             </div>
-                            <div className="min-w-0">
-                              <p className="font-medium text-sm md:text-base truncate">{u.full_name || "No Name"}</p>
-                              <p className="text-xs md:text-sm text-muted-foreground truncate">{u.email}</p>
-                            </div>
+                            <p className="text-sm text-muted-foreground line-clamp-2">{faq.answer}</p>
+                            <p className="text-xs text-muted-foreground">Order: {faq.display_order}</p>
                           </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            {u.is_frozen && <Badge variant="destructive">Frozen</Badge>}
-                            <span className="text-xs text-muted-foreground hidden md:inline">{formatDate(u.created_at)}</span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Switch
+                              checked={faq.is_active}
+                              onCheckedChange={() => handleToggleFaqActive(faq)}
+                            />
+                            <Button variant="ghost" size="icon" onClick={() => handleEditFaq(faq)}>
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteFaq(faq.id)}>
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            </Button>
                           </div>
                         </div>
-                      ))}
+                      </div>
+                    ))}
                   </div>
                 )}
               </CardContent>
@@ -842,8 +967,7 @@ const Admin = () => {
 
           {/* Settings Tab */}
           <TabsContent value="settings">
-            <div className="space-y-4 md:space-y-6">
-              {/* Contact Info */}
+            <div className="space-y-6">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
@@ -882,55 +1006,6 @@ const Admin = () => {
                 </CardContent>
               </Card>
 
-              {/* FAQ Items */}
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="text-lg md:text-xl">FAQ Items</CardTitle>
-                      <CardDescription>Manage frequently asked questions</CardDescription>
-                    </div>
-                    <Button size="sm" onClick={addFAQItem}>
-                      <Plus className="w-4 h-4 mr-1" />Add FAQ
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {faqItems.map((faq, index) => (
-                    <div key={index} className="p-4 border border-border rounded-lg space-y-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 space-y-3">
-                          <div className="space-y-2">
-                            <Label>Question</Label>
-                            <Input
-                              value={faq.question}
-                              onChange={(e) => updateFAQItem(index, "question", e.target.value)}
-                              placeholder="Enter question..."
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Answer</Label>
-                            <Textarea
-                              value={faq.answer}
-                              onChange={(e) => updateFAQItem(index, "answer", e.target.value)}
-                              placeholder="Enter answer..."
-                              rows={2}
-                            />
-                          </div>
-                        </div>
-                        <Button variant="ghost" size="icon" onClick={() => removeFAQItem(index)}>
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                  {faqItems.length === 0 && (
-                    <p className="text-center py-4 text-muted-foreground">No FAQ items. Click "Add FAQ" to create one.</p>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Save Button */}
               <div className="flex justify-end">
                 <Button onClick={handleSaveSettings} disabled={isSavingSettings} className="bg-primary hover:bg-primary/90">
                   <Save className="w-4 h-4 mr-2" />
@@ -941,6 +1016,76 @@ const Admin = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* FAQ Dialog */}
+      <Dialog open={faqDialogOpen} onOpenChange={setFaqDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingFaq ? "Edit FAQ" : "Add New FAQ"}</DialogTitle>
+            <DialogDescription>
+              {editingFaq ? "Update the FAQ details below." : "Create a new frequently asked question."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Question</Label>
+              <Input
+                value={faqForm.question}
+                onChange={(e) => setFaqForm({ ...faqForm, question: e.target.value })}
+                placeholder="Enter the question..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Answer</Label>
+              <Textarea
+                value={faqForm.answer}
+                onChange={(e) => setFaqForm({ ...faqForm, answer: e.target.value })}
+                placeholder="Enter the answer..."
+                rows={4}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Category</Label>
+                <Select value={faqForm.category} onValueChange={(v) => setFaqForm({ ...faqForm, category: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="general">General</SelectItem>
+                    <SelectItem value="investments">Investments</SelectItem>
+                    <SelectItem value="deposits">Deposits</SelectItem>
+                    <SelectItem value="withdrawals">Withdrawals</SelectItem>
+                    <SelectItem value="security">Security</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Display Order</Label>
+                <Input
+                  type="number"
+                  value={faqForm.display_order}
+                  onChange={(e) => setFaqForm({ ...faqForm, display_order: parseInt(e.target.value) || 0 })}
+                  min={0}
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={faqForm.is_active}
+                onCheckedChange={(v) => setFaqForm({ ...faqForm, is_active: v })}
+              />
+              <Label>Active (visible to users)</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFaqDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveFaq} disabled={!faqForm.question.trim() || !faqForm.answer.trim()}>
+              {editingFaq ? "Update" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Reply Dialog */}
       <Dialog open={replyDialogOpen} onOpenChange={setReplyDialogOpen}>
