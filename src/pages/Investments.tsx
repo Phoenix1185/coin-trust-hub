@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useBTCPrice } from "@/hooks/useBTCPrice";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,9 +40,11 @@ interface UserInvestment {
 }
 
 const Investments = () => {
-  const { user, isLoading } = useAuth();
+  const { user, profile, isLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { formatBTC, btcPrice, btcToUSD, formatFiatAmount } = useBTCPrice();
+  const currency = profile?.preferred_currency || "USD";
   
   const [plans, setPlans] = useState<InvestmentPlan[]>([]);
   const [userInvestments, setUserInvestments] = useState<UserInvestment[]>([]);
@@ -262,7 +265,8 @@ const Investments = () => {
           </div>
           <div className="text-right">
             <p className="text-sm text-muted-foreground">Available Balance</p>
-            <p className="text-xl font-bold text-primary">{balance.toFixed(4)} BTC</p>
+            <p className="text-xl font-bold text-primary">{formatFiatAmount(btcToUSD(balance), currency)}</p>
+            <p className="text-xs text-muted-foreground">{formatBTC(balance)}</p>
           </div>
         </div>
 
@@ -301,11 +305,11 @@ const Investments = () => {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Min</span>
-                    <span>{plan.min_amount} BTC</span>
+                    <span>{formatFiatAmount(btcToUSD(plan.min_amount), currency)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Max</span>
-                    <span>{plan.max_amount} BTC</span>
+                    <span>{formatFiatAmount(btcToUSD(plan.max_amount), currency)}</span>
                   </div>
                 </div>
                 <Button className="w-full">Invest Now</Button>
@@ -339,13 +343,19 @@ const Investments = () => {
                         <div>
                           <p className="font-medium">{investment.investment_plans.name}</p>
                           <p className="text-sm text-muted-foreground">
-                            {investment.amount.toFixed(4)} BTC invested
+                            {formatFiatAmount(btcToUSD(investment.amount), currency)} invested
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatBTC(investment.amount)}
                           </p>
                         </div>
                       </div>
                       <div className="text-right">
                         <p className="font-medium text-success">
-                          +{(investment.expected_return || 0).toFixed(4)} BTC
+                          +{formatFiatAmount(btcToUSD(investment.expected_return || 0), currency)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          +{formatBTC(investment.expected_return || 0)}
                         </p>
                         <p className="text-sm text-muted-foreground capitalize">
                           {investment.status}
@@ -389,7 +399,7 @@ const Investments = () => {
                   onChange={(e) => setInvestAmount(e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Available: {balance.toFixed(8)} BTC
+                  Available: {formatFiatAmount(btcToUSD(balance), currency)} ({formatBTC(balance)})
                 </p>
               </div>
 
@@ -397,19 +407,24 @@ const Investments = () => {
                 <div className="p-4 bg-muted rounded-lg space-y-2">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Investment</span>
-                    <span>{parseFloat(investAmount).toFixed(8)} BTC</span>
+                    <div className="text-right">
+                      <span className="block">{formatFiatAmount(btcToUSD(parseFloat(investAmount)), currency)}</span>
+                      <span className="text-xs text-muted-foreground">{formatBTC(parseFloat(investAmount))}</span>
+                    </div>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">ROI ({selectedPlan?.roi_percentage}%)</span>
-                    <span className="text-success">
-                      +{(parseFloat(investAmount) * (selectedPlan?.roi_percentage || 0) / 100).toFixed(8)} BTC
-                    </span>
+                    <div className="text-right text-success">
+                      <span className="block">+{formatFiatAmount(btcToUSD(parseFloat(investAmount) * (selectedPlan?.roi_percentage || 0) / 100), currency)}</span>
+                      <span className="text-xs">+{formatBTC(parseFloat(investAmount) * (selectedPlan?.roi_percentage || 0) / 100)}</span>
+                    </div>
                   </div>
                   <div className="flex justify-between font-medium pt-2 border-t border-border">
                     <span>Expected Return</span>
-                    <span className="text-primary">
-                      {(parseFloat(investAmount) * (1 + (selectedPlan?.roi_percentage || 0) / 100)).toFixed(8)} BTC
-                    </span>
+                    <div className="text-right text-primary">
+                      <span className="block">{formatFiatAmount(btcToUSD(parseFloat(investAmount) * (1 + (selectedPlan?.roi_percentage || 0) / 100)), currency)}</span>
+                      <span className="text-xs">{formatBTC(parseFloat(investAmount) * (1 + (selectedPlan?.roi_percentage || 0) / 100))}</span>
+                    </div>
                   </div>
                 </div>
               )}

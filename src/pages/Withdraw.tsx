@@ -28,10 +28,12 @@ interface WithdrawalSettings {
 }
 
 const Withdraw = () => {
-  const { user, isLoading } = useAuth();
+  const { user, profile, isLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { formatBTC, formatUSD, btcPrice } = useBTCPrice();
+  const { formatBTC, btcPrice, btcToUSD, usdToBTC, formatFiatAmount, getCurrencySymbol, convertFromUSD
+  } = useBTCPrice();
+  const currency = profile?.preferred_currency || "USD";
   
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [settings, setSettings] = useState<WithdrawalSettings | null>(null);
@@ -151,8 +153,8 @@ const Withdraw = () => {
       return;
     }
 
-    const amountNum = parseFloat(amount);
-    if (isNaN(amountNum) || amountNum <= 0) {
+    const fiatAmount = parseFloat(amount);
+    if (isNaN(fiatAmount) || fiatAmount <= 0) {
       toast({
         title: "Invalid Amount",
         description: "Please enter a valid amount",
@@ -161,16 +163,22 @@ const Withdraw = () => {
       return;
     }
 
-    if (settings && amountNum < settings.min_withdrawal_amount) {
+    // Convert fiat to BTC for storage
+    const exchangeRate = currency === "USD" ? 1 : currency === "EUR" ? 0.92 : 0.79;
+    const usdAmount = fiatAmount / exchangeRate;
+    const btcAmount = usdToBTC(usdAmount);
+
+    const minBtc = settings?.min_withdrawal_amount ?? 0.001;
+    if (btcAmount < minBtc) {
       toast({
         title: "Amount Too Low",
-        description: `Minimum withdrawal is ${settings.min_withdrawal_amount} BTC`,
+        description: `Minimum withdrawal is ${formatFiatAmount(btcToUSD(minBtc), currency)}`,
         variant: "destructive",
       });
       return;
     }
 
-    if (amountNum > balance) {
+    if (btcAmount > balance) {
       toast({
         title: "Insufficient Balance",
         description: "You don't have enough balance for this withdrawal",
@@ -192,7 +200,7 @@ const Withdraw = () => {
 
     const { error } = await supabase.from("withdrawals").insert({
       user_id: user.id,
-      amount: amountNum,
+      amount: btcAmount,
       wallet_address: walletAddress,
       status: "pending",
     });
@@ -283,18 +291,23 @@ const Withdraw = () => {
                 </div>
                 <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                   <span className="text-sm">Minimum Withdrawal</span>
-                  <span className="text-sm font-mono">
-                    {settings?.min_withdrawal_amount ?? 0.001} BTC
-                  </span>
+                  <div className="text-right">
+                    <span className="text-sm font-mono block">
+                      {formatFiatAmount(btcToUSD(settings?.min_withdrawal_amount ?? 0.001), currency)}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {formatBTC(settings?.min_withdrawal_amount ?? 0.001)}
+                    </span>
+                  </div>
                 </div>
                 <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                   <span className="text-sm">Available Balance</span>
                   <div className="text-right">
                     <span className="text-sm font-mono text-primary block">
-                      {formatBTC(balance)}
+                      {formatFiatAmount(btcToUSD(balance), currency)}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      {formatUSD(balance)}
+                      {formatBTC(balance)}
                     </span>
                   </div>
                 </div>
@@ -325,22 +338,28 @@ const Withdraw = () => {
             <CardContent>
               <form onSubmit={handleSubmitWithdrawal} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="amount">Amount (BTC)</Label>
-                  <Input
-                    id="amount"
-                    type="number"
-                    step="0.00000001"
-                    placeholder="0.00000000"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    required
-                  />
+                  <Label htmlFor="amount">Amount ({currency})</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                      {getCurrencySymbol(currency)}
+                    </span>
+                    <Input
+                      id="amount"
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      className="pl-8"
+                      required
+                    />
+                  </div>
                   <p className="text-xs text-muted-foreground">
-                    Available: {formatBTC(balance)} ({formatUSD(balance)})
+                    Available: {formatFiatAmount(btcToUSD(balance), currency)} ({formatBTC(balance)})
                   </p>
                   {amount && parseFloat(amount) > 0 && (
                     <p className="text-xs text-primary">
-                      ≈ {formatUSD(parseFloat(amount))} (1 BTC = ${btcPrice.toLocaleString()})
+                      ≈ {formatBTC(usdToBTC(parseFloat(amount) / (currency === "USD" ? 1 : currency === "EUR" ? 0.92 : 0.79)))}
                     </p>
                   )}
                 </div>
@@ -385,8 +404,8 @@ const Withdraw = () => {
                     className="flex items-center justify-between p-4 bg-muted/50 rounded-lg"
                   >
                     <div>
-                      <p className="font-medium">{formatBTC(withdrawal.amount)}</p>
-                      <p className="text-xs text-muted-foreground">{formatUSD(withdrawal.amount)}</p>
+                      <p className="font-medium">{formatFiatAmount(btcToUSD(withdrawal.amount), currency)}</p>
+                      <p className="text-xs text-muted-foreground">{formatBTC(withdrawal.amount)}</p>
                       <p className="text-sm text-muted-foreground">
                         {formatDate(withdrawal.created_at)}
                       </p>
