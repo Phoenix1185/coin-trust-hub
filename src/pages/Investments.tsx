@@ -187,10 +187,12 @@ const Investments = () => {
     // Convert fiat input to BTC for validation and storage
     const btcAmount = fiatToBTC(fiatAmount, currency);
 
-    if (fiatAmount < 50) {
+    // Validate against plan-specific minimum (convert BTC min_amount to fiat)
+    const minFiatAmount = btcToUSD(selectedPlan.min_amount);
+    if (fiatAmount < minFiatAmount) {
       toast({
         title: "Amount Too Low",
-        description: `Minimum investment is ${getCurrencySymbol(currency)}50`,
+        description: `Minimum investment for ${selectedPlan.name} is ${formatFiatAmount(minFiatAmount, currency)}`,
         variant: "destructive",
       });
       return;
@@ -305,7 +307,7 @@ const Investments = () => {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Min</span>
-                    <span>{getCurrencySymbol(currency)}50</span>
+                    <span>{formatFiatAmount(btcToUSD(plan.min_amount), currency)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Max</span>
@@ -364,7 +366,7 @@ const Investments = () => {
                   <Input
                     type="number"
                     step="0.01"
-                    min="50"
+                    min={selectedPlan ? btcToUSD(selectedPlan.min_amount).toFixed(2) : "0"}
                     placeholder="50.00"
                     className="pl-8"
                     value={investAmount}
@@ -380,11 +382,11 @@ const Investments = () => {
                   Available: {formatFiatAmount(btcToUSD(balance), currency)} ({formatBTC(balance)})
                 </p>
                 <p className="text-xs text-primary">
-                  Minimum investment: {getCurrencySymbol(currency)}50
+                  Minimum investment: {selectedPlan ? formatFiatAmount(btcToUSD(selectedPlan.min_amount), currency) : "varies by plan"}
                 </p>
               </div>
 
-              {investAmount && parseFloat(investAmount) >= 50 && (
+              {investAmount && selectedPlan && parseFloat(investAmount) >= btcToUSD(selectedPlan.min_amount) && (
                 <div className="p-4 bg-muted rounded-lg space-y-2">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Investment</span>

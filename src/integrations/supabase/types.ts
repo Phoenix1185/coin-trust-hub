@@ -98,6 +98,7 @@ export type Database = {
           amount: number
           created_at: string
           id: string
+          payment_method: string | null
           reviewed_at: string | null
           reviewed_by: string | null
           status: Database["public"]["Enums"]["transaction_status"]
@@ -109,6 +110,7 @@ export type Database = {
           amount: number
           created_at?: string
           id?: string
+          payment_method?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: Database["public"]["Enums"]["transaction_status"]
@@ -120,6 +122,7 @@ export type Database = {
           amount?: number
           created_at?: string
           id?: string
+          payment_method?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: Database["public"]["Enums"]["transaction_status"]
@@ -230,6 +233,48 @@ export type Database = {
           title?: string
           type?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      payment_methods: {
+        Row: {
+          created_at: string
+          description: string | null
+          display_order: number | null
+          icon: string | null
+          id: string
+          instructions: string | null
+          is_active: boolean | null
+          name: string
+          type: string
+          updated_at: string
+          wallet_address: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          icon?: string | null
+          id?: string
+          instructions?: string | null
+          is_active?: boolean | null
+          name: string
+          type: string
+          updated_at?: string
+          wallet_address?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          icon?: string | null
+          id?: string
+          instructions?: string | null
+          is_active?: boolean | null
+          name?: string
+          type?: string
+          updated_at?: string
+          wallet_address?: string | null
         }
         Relationships: []
       }
@@ -487,6 +532,7 @@ export type Database = {
           created_at: string
           decline_reason: string | null
           id: string
+          payment_method: string | null
           reviewed_at: string | null
           reviewed_by: string | null
           status: Database["public"]["Enums"]["transaction_status"]
@@ -499,6 +545,7 @@ export type Database = {
           created_at?: string
           decline_reason?: string | null
           id?: string
+          payment_method?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: Database["public"]["Enums"]["transaction_status"]
@@ -511,6 +558,7 @@ export type Database = {
           created_at?: string
           decline_reason?: string | null
           id?: string
+          payment_method?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: Database["public"]["Enums"]["transaction_status"]

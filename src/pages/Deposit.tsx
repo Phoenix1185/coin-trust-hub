@@ -9,8 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Copy, CheckCircle, Clock, XCircle, QrCode } from "lucide-react";
+import { Copy, CheckCircle, Clock, XCircle, QrCode, Wallet, CreditCard, Landmark, Bitcoin } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 interface DepositAddress {
   id: string;
@@ -18,13 +19,39 @@ interface DepositAddress {
   label: string | null;
 }
 
+interface PaymentMethod {
+  id: string;
+  name: string;
+  type: string;
+  icon: string;
+  description: string | null;
+  wallet_address: string | null;
+  instructions: string | null;
+}
+
 interface Deposit {
   id: string;
   amount: number;
   txid: string | null;
   status: string;
+  payment_method: string | null;
   created_at: string;
 }
+
+const getPaymentIcon = (icon: string) => {
+  switch (icon) {
+    case "bitcoin":
+      return <Bitcoin className="w-5 h-5" />;
+    case "usdt":
+      return <Wallet className="w-5 h-5" />;
+    case "paypal":
+      return <CreditCard className="w-5 h-5" />;
+    case "bank":
+      return <Landmark className="w-5 h-5" />;
+    default:
+      return <Wallet className="w-5 h-5" />;
+  }
+};
 
 const Deposit = () => {
   const { user, profile, isLoading } = useAuth();
@@ -34,6 +61,8 @@ const Deposit = () => {
   const currency = profile?.preferred_currency || "USD";
   
   const [depositAddress, setDepositAddress] = useState<DepositAddress | null>(null);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [selectedMethod, setSelectedMethod] = useState<string>("");
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [amount, setAmount] = useState("");
   const [txid, setTxid] = useState("");
@@ -49,9 +78,26 @@ const Deposit = () => {
   useEffect(() => {
     if (user) {
       fetchDepositAddress();
+      fetchPaymentMethods();
       fetchDeposits();
     }
   }, [user]);
+
+  const fetchPaymentMethods = async () => {
+    const { data, error } = await supabase
+      .from("payment_methods")
+      .select("*")
+      .in("type", ["deposit", "both"])
+      .eq("is_active", true)
+      .order("display_order", { ascending: true });
+
+    if (!error && data) {
+      setPaymentMethods(data);
+      if (data.length > 0) {
+        setSelectedMethod(data[0].id);
+      }
+    }
+  };
 
   const fetchDepositAddress = async () => {
     const { data, error } = await supabase
@@ -83,25 +129,23 @@ const Deposit = () => {
     }
   };
 
-  const handleCopyAddress = async () => {
-    if (depositAddress) {
-      await navigator.clipboard.writeText(depositAddress.address);
-      setCopied(true);
-      toast({
-        title: "Address Copied",
-        description: "BTC address copied to clipboard",
-      });
-      setTimeout(() => setCopied(false), 2000);
-    }
+  const handleCopyAddress = async (address: string) => {
+    await navigator.clipboard.writeText(address);
+    setCopied(true);
+    toast({
+      title: "Address Copied",
+      description: "Address copied to clipboard",
+    });
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleSubmitDeposit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!user || !amount) {
+    if (!user || !amount || !selectedMethod) {
       toast({
         title: "Missing Information",
-        description: "Please enter the deposit amount",
+        description: "Please select a payment method and enter the deposit amount",
         variant: "destructive",
       });
       return;
@@ -122,6 +166,8 @@ const Deposit = () => {
     const usdAmount = fiatAmount / exchangeRate;
     const btcAmount = usdToBTC(usdAmount);
 
+    const selectedPayment = paymentMethods.find(m => m.id === selectedMethod);
+
     setIsSubmitting(true);
 
     const { error } = await supabase.from("deposits").insert({
@@ -129,6 +175,7 @@ const Deposit = () => {
       amount: btcAmount,
       txid: txid || null,
       status: "pending",
+      payment_method: selectedPayment?.name || null,
     });
 
     if (error) {
@@ -173,6 +220,8 @@ const Deposit = () => {
     });
   };
 
+  const selectedPaymentMethod = paymentMethods.find(m => m.id === selectedMethod);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -190,25 +239,62 @@ const Deposit = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Deposit Address */}
+          {/* Payment Method Selection */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <QrCode className="w-5 h-5 text-primary" />
-                Bitcoin Deposit Address
+                <Wallet className="w-5 h-5 text-primary" />
+                Select Payment Method
               </CardTitle>
               <CardDescription>
-                Send BTC to this address to fund your account
+                Choose how you want to deposit funds
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {depositAddress ? (
-                <>
+              {paymentMethods.length > 0 ? (
+                <RadioGroup value={selectedMethod} onValueChange={setSelectedMethod}>
+                  {paymentMethods.map((method) => (
+                    <div
+                      key={method.id}
+                      className={cn(
+                        "flex items-center space-x-3 p-4 rounded-lg border cursor-pointer transition-colors",
+                        selectedMethod === method.id
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-primary/50"
+                      )}
+                      onClick={() => setSelectedMethod(method.id)}
+                    >
+                      <RadioGroupItem value={method.id} id={method.id} />
+                      <div className="flex items-center gap-3 flex-1">
+                        <div className="p-2 bg-muted rounded-lg text-primary">
+                          {getPaymentIcon(method.icon)}
+                        </div>
+                        <div>
+                          <Label htmlFor={method.id} className="font-medium cursor-pointer">
+                            {method.name}
+                          </Label>
+                          {method.description && (
+                            <p className="text-xs text-muted-foreground">{method.description}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </RadioGroup>
+              ) : (
+                <p className="text-muted-foreground text-center py-8">
+                  No payment methods available. Please contact support.
+                </p>
+              )}
+
+              {/* Show deposit address for crypto methods */}
+              {selectedPaymentMethod?.icon === "bitcoin" && depositAddress && (
+                <div className="mt-4 space-y-4">
                   <div className="flex justify-center p-4 bg-white rounded-lg">
                     <img
                       src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${depositAddress.address}`}
                       alt="QR Code"
-                      className="w-48 h-48"
+                      className="w-40 h-40"
                     />
                   </div>
                   <div className="space-y-2">
@@ -222,7 +308,7 @@ const Deposit = () => {
                       <Button
                         variant="outline"
                         size="icon"
-                        onClick={handleCopyAddress}
+                        onClick={() => handleCopyAddress(depositAddress.address)}
                       >
                         {copied ? (
                           <CheckCircle className="w-4 h-4 text-success" />
@@ -232,16 +318,48 @@ const Deposit = () => {
                       </Button>
                     </div>
                   </div>
-                  {depositAddress.label && (
-                    <p className="text-sm text-muted-foreground">
-                      {depositAddress.label}
-                    </p>
-                  )}
-                </>
-              ) : (
-                <p className="text-muted-foreground text-center py-8">
-                  No deposit address available. Please contact support.
-                </p>
+                </div>
+              )}
+
+              {/* Show wallet address for USDT */}
+              {selectedPaymentMethod?.icon === "usdt" && selectedPaymentMethod.wallet_address && (
+                <div className="mt-4 space-y-4">
+                  <div className="flex justify-center p-4 bg-white rounded-lg">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${selectedPaymentMethod.wallet_address}`}
+                      alt="QR Code"
+                      className="w-40 h-40"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>USDT (BEP20) Address</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        value={selectedPaymentMethod.wallet_address}
+                        readOnly
+                        className="font-mono text-sm"
+                      />
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => handleCopyAddress(selectedPaymentMethod.wallet_address!)}
+                      >
+                        {copied ? (
+                          <CheckCircle className="w-4 h-4 text-success" />
+                        ) : (
+                          <Copy className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Show instructions for other methods */}
+              {selectedPaymentMethod?.instructions && (
+                <div className="mt-4 p-4 bg-muted/50 rounded-lg">
+                  <p className="text-sm">{selectedPaymentMethod.instructions}</p>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -251,7 +369,7 @@ const Deposit = () => {
             <CardHeader>
               <CardTitle>Submit Deposit</CardTitle>
               <CardDescription>
-                After sending BTC, submit your deposit details for verification
+                After sending funds, submit your deposit details for verification
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -280,22 +398,22 @@ const Deposit = () => {
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="txid">Transaction ID (Optional)</Label>
+                  <Label htmlFor="txid">Transaction ID / Reference (Optional)</Label>
                   <Input
                     id="txid"
                     type="text"
-                    placeholder="Enter your transaction ID"
+                    placeholder="Enter your transaction ID or reference"
                     value={txid}
                     onChange={(e) => setTxid(e.target.value)}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Providing the TXID helps speed up verification
+                    Providing a reference helps speed up verification
                   </p>
                 </div>
                 <Button
                   type="submit"
                   className="w-full bg-success hover:bg-success/90"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !selectedMethod}
                 >
                   {isSubmitting ? "Submitting..." : "Submit Deposit"}
                 </Button>
@@ -327,9 +445,14 @@ const Deposit = () => {
                       <p className="text-sm text-muted-foreground">
                         {formatDate(deposit.created_at)}
                       </p>
+                      {deposit.payment_method && (
+                        <p className="text-xs text-primary">
+                          via {deposit.payment_method}
+                        </p>
+                      )}
                       {deposit.txid && (
                         <p className="text-xs text-muted-foreground font-mono truncate max-w-[200px]">
-                          TXID: {deposit.txid}
+                          Ref: {deposit.txid}
                         </p>
                       )}
                     </div>
