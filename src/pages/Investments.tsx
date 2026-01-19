@@ -68,6 +68,28 @@ const Investments = () => {
   useEffect(() => {
     if (user) {
       fetchData();
+      
+      // Subscribe to real-time investment updates for settlement changes
+      const channel = supabase
+        .channel('investment-updates')
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'user_investments',
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => {
+            // Refetch data when investments are updated (e.g., by settlement engine)
+            fetchData();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [user]);
 
