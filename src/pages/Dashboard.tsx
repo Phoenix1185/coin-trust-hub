@@ -6,6 +6,7 @@ import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
 import DashboardLayout from "@/components/DashboardLayout";
 import CryptoChart from "@/components/CryptoChart";
 import LiveTicker from "@/components/LiveTicker";
+import ActiveInvestmentSummary from "@/components/ActiveInvestmentSummary";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -259,6 +260,9 @@ const Dashboard = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Active Investment Summary - Expandable */}
+        <ActiveInvestmentSummary />
 
         {/* Quick Actions - Mobile only */}
         <div className="grid grid-cols-3 gap-2 sm:hidden">
