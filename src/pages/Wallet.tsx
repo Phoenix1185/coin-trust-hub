@@ -3,11 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useBTCPrice } from "@/hooks/useBTCPrice";
 import DashboardLayout from "@/components/DashboardLayout";
+import ActiveInvestmentSummary from "@/components/ActiveInvestmentSummary";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowDownCircle, ArrowUpCircle, Bitcoin, Wallet as WalletIcon, TrendingUp, History } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Bitcoin, Wallet as WalletIcon, TrendingUp, History, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Transaction {
@@ -18,12 +19,18 @@ interface Transaction {
   created_at: string;
 }
 
+interface WalletData {
+  balance: number;
+  lockedProfit: number;
+  lockedCapital: number;
+}
+
 const Wallet = () => {
   const { user, profile, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { btcPrice, formatBTC, btcToUSD, formatFiatAmount, isLoading: priceLoading } = useBTCPrice();
   const currency = profile?.preferred_currency || "USD";
-  const [balance, setBalance] = useState<number>(0);
+  const [walletData, setWalletData] = useState<WalletData>({ balance: 0, lockedProfit: 0, lockedCapital: 0 });
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -43,7 +50,6 @@ const Wallet = () => {
     if (!user) return;
     
     try {
-      // Fetch balance using the same calculation as Dashboard
       const [deposits, withdrawals, investments] = await Promise.all([
         supabase
           .from("deposits")
@@ -57,12 +63,11 @@ const Wallet = () => {
           .order("created_at", { ascending: false }),
         supabase
           .from("user_investments")
-          .select("id, amount, status, expected_return, actual_return, created_at")
+          .select("id, amount, status, expected_return, actual_return, accrued_profit, created_at")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false }),
       ]);
 
-      // Calculate balance (same logic as Dashboard)
       const approvedDeposits = deposits.data?.filter(d => d.status === "approved") || [];
       const approvedWithdrawals = withdrawals.data?.filter(w => w.status === "approved") || [];
       const activeInvests = investments.data?.filter(i => i.status === "active" || i.status === "pending") || [];
@@ -71,11 +76,16 @@ const Wallet = () => {
       const totalDeposited = approvedDeposits.reduce((sum, d) => sum + Number(d.amount), 0);
       const totalWithdrawn = approvedWithdrawals.reduce((sum, w) => sum + Number(w.amount), 0);
       const investedAmount = activeInvests.reduce((sum, i) => sum + Number(i.amount), 0);
-      // Use actual_return for completed investments (from settlement engine), fallback to expected_return
+      const lockedProfit = activeInvests.reduce((sum, i) => sum + Number(i.accrued_profit || 0), 0);
       const returnedAmount = completedInvests.reduce((sum, i) => sum + Number(i.actual_return || i.expected_return || 0), 0);
 
       const calculatedBalance = totalDeposited - totalWithdrawn - investedAmount + returnedAmount;
-      setBalance(Math.max(0, calculatedBalance));
+      
+      setWalletData({
+        balance: Math.max(0, calculatedBalance),
+        lockedProfit,
+        lockedCapital: investedAmount,
+      });
 
       const allTransactions: Transaction[] = [
         ...(deposits.data?.map((d) => ({ ...d, type: "deposit" as const })) || []),
@@ -153,7 +163,7 @@ const Wallet = () => {
         </div>
 
         {/* Balance Cards */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card className="bg-gradient-to-br from-primary/20 to-primary/5 border-primary/20 glow-gold-sm">
             <CardHeader className="pb-2">
               <CardDescription className="flex items-center gap-2">
@@ -166,11 +176,34 @@ const Wallet = () => {
                 <Skeleton className="h-10 w-32" />
               ) : (
                 <>
-                  <div className="text-3xl md:text-4xl font-bold text-gradient-gold">
-                    {formatFiatAmount(btcToUSD(balance), currency)}
+                  <div className="text-2xl md:text-3xl font-bold text-gradient-gold">
+                    {formatFiatAmount(btcToUSD(walletData.balance), currency)}
                   </div>
-                  <div className="text-lg text-muted-foreground mt-1">
-                    {formatBTC(balance)}
+                  <div className="text-sm text-muted-foreground mt-1">
+                    {formatBTC(walletData.balance)}
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-success/20 bg-success/5">
+            <CardHeader className="pb-2">
+              <CardDescription className="flex items-center gap-2">
+                <Lock className="w-4 h-4" />
+                Locked Profit
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoading || priceLoading ? (
+                <Skeleton className="h-10 w-32" />
+              ) : (
+                <>
+                  <div className="text-2xl md:text-3xl font-bold text-success">
+                    +{formatFiatAmount(btcToUSD(walletData.lockedProfit), currency)}
+                  </div>
+                  <div className="text-sm text-muted-foreground mt-1">
+                    {formatBTC(walletData.lockedProfit)} (locked)
                   </div>
                 </>
               )}
@@ -188,36 +221,41 @@ const Wallet = () => {
               {priceLoading ? (
                 <Skeleton className="h-10 w-32" />
               ) : (
-                <div className="text-3xl md:text-4xl font-bold">
+                <div className="text-2xl md:text-3xl font-bold">
                   ${btcPrice.toLocaleString()}
                 </div>
               )}
             </CardContent>
           </Card>
 
-          <Card className="md:col-span-2 lg:col-span-1 border-border">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">Quick Actions</CardTitle>
+          <Card className="border-border">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Quick Actions</CardTitle>
             </CardHeader>
-            <CardContent className="flex gap-3">
+            <CardContent className="flex gap-2">
               <Button 
                 onClick={() => navigate("/deposit")} 
                 className="flex-1 bg-success hover:bg-success/90"
+                size="sm"
               >
-                <ArrowDownCircle className="w-4 h-4 mr-2" />
+                <ArrowDownCircle className="w-4 h-4 mr-1" />
                 Deposit
               </Button>
               <Button 
                 onClick={() => navigate("/withdraw")} 
                 variant="outline"
                 className="flex-1 border-primary text-primary hover:bg-primary/10"
+                size="sm"
               >
-                <ArrowUpCircle className="w-4 h-4 mr-2" />
+                <ArrowUpCircle className="w-4 h-4 mr-1" />
                 Withdraw
               </Button>
             </CardContent>
           </Card>
         </div>
+
+        {/* Active Investment Summary */}
+        <ActiveInvestmentSummary />
 
         {/* Recent Transactions */}
         <Card>
