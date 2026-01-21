@@ -25,7 +25,7 @@ const Wallet = () => {
   const { user, profile, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { btcPrice, formatBTC, btcToUSD, formatFiatAmount, isLoading: priceLoading } = useBTCPrice();
-  const { balance, lockedCapital, lockedProfit } = useBalance();
+  const { mainBalance, investmentBalance, lockedCapital, lockedProfit } = useBalance();
   const currency = profile?.preferred_currency || "USD";
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -145,7 +145,7 @@ const Wallet = () => {
             <CardHeader className="pb-2">
               <CardDescription className="flex items-center gap-2">
                 <WalletIcon className="w-4 h-4" />
-                Available Balance
+                Main Balance
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -154,11 +154,36 @@ const Wallet = () => {
               ) : (
                 <>
                   <div className="text-2xl md:text-3xl font-bold text-gradient-gold">
-                    {formatFiatAmount(btcToUSD(balance), currency)}
+                    {formatFiatAmount(btcToUSD(mainBalance), currency)}
                   </div>
                   <div className="text-sm text-muted-foreground mt-1">
-                    {formatBTC(balance)}
+                    {formatBTC(mainBalance)}
                   </div>
+                  <p className="text-xs text-muted-foreground mt-1">Available for withdrawal</p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-amber-500/20 to-amber-500/5 border-amber-500/20">
+            <CardHeader className="pb-2">
+              <CardDescription className="flex items-center gap-2">
+                <TrendingUp className="w-4 h-4" />
+                Investment Balance
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoading || priceLoading ? (
+                <Skeleton className="h-10 w-32" />
+              ) : (
+                <>
+                  <div className="text-2xl md:text-3xl font-bold text-amber-500">
+                    {formatFiatAmount(btcToUSD(investmentBalance), currency)}
+                  </div>
+                  <div className="text-sm text-muted-foreground mt-1">
+                    {formatBTC(investmentBalance)}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Locked in active plans</p>
                 </>
               )}
             </CardContent>
@@ -168,7 +193,7 @@ const Wallet = () => {
             <CardHeader className="pb-2">
               <CardDescription className="flex items-center gap-2">
                 <Lock className="w-4 h-4" />
-                Locked Profit
+                Accrued Profit
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -180,8 +205,9 @@ const Wallet = () => {
                     +{formatFiatAmount(btcToUSD(lockedProfit), currency)}
                   </div>
                   <div className="text-sm text-muted-foreground mt-1">
-                    {formatBTC(lockedProfit)} (locked)
+                    {formatBTC(lockedProfit)}
                   </div>
+                  <p className="text-xs text-muted-foreground mt-1">Locked until plan completes</p>
                 </>
               )}
             </CardContent>

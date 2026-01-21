@@ -19,6 +19,7 @@ interface InvestmentPlan {
   name: string;
   description: string | null;
   duration_days: number;
+  duration_hours: number | null;
   min_amount: number;
   max_amount: number;
   roi_percentage: number;
@@ -40,6 +41,7 @@ interface UserInvestment {
   investment_plans: {
     name: string;
     duration_days: number;
+    duration_hours?: number | null;
     roi_percentage: number;
   };
 }
@@ -49,7 +51,7 @@ const Investments = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { formatBTC, btcPrice, btcToUSD, formatFiatAmount, fiatToBTC, getCurrencySymbol } = useBTCPrice();
-  const { balance, refetch: refetchBalance } = useBalance();
+  const { mainBalance, investmentBalance, refetch: refetchBalance } = useBalance();
   const currency = (profile?.preferred_currency || "USD") as "USD" | "EUR" | "GBP";
   
   const [plans, setPlans] = useState<InvestmentPlan[]>([]);
@@ -120,6 +122,7 @@ const Investments = () => {
         investment_plans (
           name,
           duration_days,
+          duration_hours,
           roi_percentage
         )
       `)
@@ -181,7 +184,7 @@ const Investments = () => {
       return;
     }
 
-    if (btcAmount > balance) {
+    if (btcAmount > mainBalance) {
       toast({
         title: "Insufficient Balance",
         description: "You don't have enough balance for this investment",
@@ -241,9 +244,9 @@ const Investments = () => {
             <p className="text-muted-foreground">Choose a plan that fits your goals</p>
           </div>
           <div className="text-right">
-            <p className="text-sm text-muted-foreground">Available Balance</p>
-            <p className="text-xl font-bold text-primary">{formatFiatAmount(btcToUSD(balance), currency)}</p>
-            <p className="text-xs text-muted-foreground">{formatBTC(balance)}</p>
+            <p className="text-sm text-muted-foreground">Main Balance</p>
+            <p className="text-xl font-bold text-primary">{formatFiatAmount(btcToUSD(mainBalance), currency)}</p>
+            <p className="text-xs text-muted-foreground">{formatBTC(mainBalance)}</p>
           </div>
         </div>
 
@@ -278,7 +281,9 @@ const Investments = () => {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Duration</span>
-                    <span>{plan.duration_days} days</span>
+                    <span>
+                      {plan.duration_hours ? `${plan.duration_hours} hours` : `${plan.duration_days} days`}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Min</span>
@@ -354,7 +359,7 @@ const Investments = () => {
                   </p>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  Available: {formatFiatAmount(btcToUSD(balance), currency)} ({formatBTC(balance)})
+                  Main Balance: {formatFiatAmount(btcToUSD(mainBalance), currency)} ({formatBTC(mainBalance)})
                 </p>
                 <p className="text-xs text-primary">
                   Minimum investment: {selectedPlan ? formatFiatAmount(btcToUSD(selectedPlan.min_amount), currency) : "varies by plan"}

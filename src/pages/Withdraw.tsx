@@ -117,7 +117,7 @@ const Withdraw = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { formatBTC, btcToUSD, usdToBTC, formatFiatAmount, getCurrencySymbol } = useBTCPrice();
-  const { balance, refetch: refetchBalance } = useBalance();
+  const { mainBalance, refetch: refetchBalance } = useBalance();
   const currency = profile?.preferred_currency || "USD";
   
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
@@ -344,7 +344,7 @@ const Withdraw = () => {
       return;
     }
 
-    if (btcAmount > balance) {
+    if (btcAmount > mainBalance) {
       toast({
         title: "Insufficient Balance",
         description: "You don't have enough balance for this withdrawal",
@@ -474,13 +474,13 @@ const Withdraw = () => {
                   </div>
                 </div>
                 <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                  <span className="text-sm">Available Balance</span>
+                  <span className="text-sm">Main Balance</span>
                   <div className="text-right">
                     <span className="text-sm font-mono text-primary block">
-                      {formatFiatAmount(btcToUSD(balance), currency)}
+                      {formatFiatAmount(btcToUSD(mainBalance), currency)}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      {formatBTC(balance)}
+                      {formatBTC(mainBalance)}
                     </span>
                   </div>
                 </div>
@@ -621,7 +621,7 @@ const Withdraw = () => {
                     />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Available: {formatFiatAmount(btcToUSD(balance), currency)} ({formatBTC(balance)})
+                    Main Balance: {formatFiatAmount(btcToUSD(mainBalance), currency)} ({formatBTC(mainBalance)})
                   </p>
                   {amount && parseFloat(amount) > 0 && (
                     <p className="text-xs text-primary">
@@ -633,7 +633,7 @@ const Withdraw = () => {
                 <Button
                   type="submit"
                   className="w-full"
-                  disabled={isSubmitting || !canWithdraw || balance <= 0 || !selectedMethod}
+                  disabled={isSubmitting || !canWithdraw || mainBalance <= 0 || !selectedMethod}
                 >
                   {isSubmitting ? "Submitting..." : "Request Withdrawal"}
                 </Button>
