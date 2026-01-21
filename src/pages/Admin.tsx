@@ -2437,6 +2437,100 @@ const Admin = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Payment Method Dialog */}
+      <Dialog open={paymentMethodDialogOpen} onOpenChange={setPaymentMethodDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingPaymentMethod ? "Edit Payment Method" : "Add Payment Method"}</DialogTitle>
+            <DialogDescription>Configure payment method details for deposits and withdrawals</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
+            <div className="space-y-2">
+              <Label>Name</Label>
+              <Input 
+                value={paymentMethodForm.name} 
+                onChange={(e) => setPaymentMethodForm({ ...paymentMethodForm, name: e.target.value })} 
+                placeholder="e.g., USDT, PayPal, Bank Transfer" 
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <Select value={paymentMethodForm.type} onValueChange={(v) => setPaymentMethodForm({ ...paymentMethodForm, type: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="deposit">Deposit Only</SelectItem>
+                    <SelectItem value="withdrawal">Withdrawal Only</SelectItem>
+                    <SelectItem value="both">Both</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Icon</Label>
+                <Select value={paymentMethodForm.icon} onValueChange={(v) => setPaymentMethodForm({ ...paymentMethodForm, icon: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="bitcoin">Bitcoin</SelectItem>
+                    <SelectItem value="usdt">USDT</SelectItem>
+                    <SelectItem value="usdc">USDC</SelectItem>
+                    <SelectItem value="paypal">PayPal</SelectItem>
+                    <SelectItem value="bank">Bank</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Wallet Address / Account Info</Label>
+              <Input 
+                value={paymentMethodForm.wallet_address} 
+                onChange={(e) => setPaymentMethodForm({ ...paymentMethodForm, wallet_address: e.target.value })} 
+                placeholder="Enter wallet address or account details" 
+                className="font-mono"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Input 
+                value={paymentMethodForm.description} 
+                onChange={(e) => setPaymentMethodForm({ ...paymentMethodForm, description: e.target.value })} 
+                placeholder="Short description for users" 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Instructions</Label>
+              <Textarea 
+                value={paymentMethodForm.instructions} 
+                onChange={(e) => setPaymentMethodForm({ ...paymentMethodForm, instructions: e.target.value })} 
+                placeholder="Detailed instructions for users (e.g., network to use, minimum amount)" 
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Display Order</Label>
+              <Input 
+                type="number" 
+                value={paymentMethodForm.display_order} 
+                onChange={(e) => setPaymentMethodForm({ ...paymentMethodForm, display_order: parseInt(e.target.value) || 0 })} 
+                min={0} 
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch 
+                checked={paymentMethodForm.is_active} 
+                onCheckedChange={(v) => setPaymentMethodForm({ ...paymentMethodForm, is_active: v })} 
+              />
+              <Label>Active (available to users)</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPaymentMethodDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSavePaymentMethod} disabled={!paymentMethodForm.name.trim()}>
+              {editingPaymentMethod ? "Update" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 };
