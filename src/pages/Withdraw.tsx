@@ -10,9 +10,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { CheckCircle, Clock, XCircle, AlertTriangle, ArrowUpCircle, Wallet, CreditCard, Landmark, Bitcoin, Save } from "lucide-react";
+import { CheckCircle, Clock, XCircle, AlertTriangle, ArrowUpCircle, Wallet, CreditCard, Landmark, Bitcoin, Save, Coins } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface PaymentMethod {
   id: string;
@@ -50,6 +51,8 @@ const getPaymentIcon = (icon: string) => {
       return <Bitcoin className="w-5 h-5" />;
     case "usdt":
       return <Wallet className="w-5 h-5" />;
+    case "usdc":
+      return <Coins className="w-5 h-5" />;
     case "paypal":
       return <CreditCard className="w-5 h-5" />;
     case "bank":
@@ -59,12 +62,40 @@ const getPaymentIcon = (icon: string) => {
   }
 };
 
-const getPaymentDetailFields = (icon: string): { key: string; label: string; placeholder: string; type?: string }[] => {
+const USDT_NETWORKS = [
+  { value: "ERC20", label: "Ethereum (ERC20)" },
+  { value: "TRC20", label: "Tron (TRC20)" },
+  { value: "BEP20", label: "BSC (BEP20)" },
+  { value: "POLYGON", label: "Polygon" },
+  { value: "ARBITRUM", label: "Arbitrum" },
+  { value: "OPTIMISM", label: "Optimism" },
+  { value: "SOLANA", label: "Solana" },
+];
+
+const USDC_NETWORKS = [
+  { value: "ERC20", label: "Ethereum (ERC20)" },
+  { value: "BEP20", label: "BSC (BEP20)" },
+  { value: "POLYGON", label: "Polygon" },
+  { value: "ARBITRUM", label: "Arbitrum" },
+  { value: "OPTIMISM", label: "Optimism" },
+  { value: "SOLANA", label: "Solana" },
+  { value: "BASE", label: "Base" },
+];
+
+const getPaymentDetailFields = (icon: string): { key: string; label: string; placeholder: string; type?: string; isNetworkSelector?: boolean; networks?: { value: string; label: string }[] }[] => {
   switch (icon) {
     case "bitcoin":
       return [{ key: "wallet_address", label: "BTC Wallet Address", placeholder: "Enter your BTC wallet address" }];
     case "usdt":
-      return [{ key: "wallet_address", label: "USDT (BEP20) Address", placeholder: "Enter your USDT BEP20 address" }];
+      return [
+        { key: "network", label: "Select Network", placeholder: "Choose network", isNetworkSelector: true, networks: USDT_NETWORKS },
+        { key: "wallet_address", label: "USDT Address", placeholder: "Enter your USDT address" },
+      ];
+    case "usdc":
+      return [
+        { key: "network", label: "Select Network", placeholder: "Choose network", isNetworkSelector: true, networks: USDC_NETWORKS },
+        { key: "wallet_address", label: "USDC Address", placeholder: "Enter your USDC address" },
+      ];
     case "paypal":
       return [{ key: "email", label: "PayPal Email", placeholder: "Enter your PayPal email", type: "email" }];
     case "bank":
@@ -528,17 +559,25 @@ const Withdraw = () => {
                         <Label htmlFor={field.key} className="text-sm">
                           {field.label}
                         </Label>
-                        {field.key === "bank_name" || field.key.includes("address") ? (
-                          <Input
-                            id={field.key}
-                            type={field.type || "text"}
-                            placeholder={field.placeholder}
+                        {field.isNetworkSelector && field.networks ? (
+                          <Select
                             value={paymentDetails[field.key] || ""}
-                            onChange={(e) => setPaymentDetails(prev => ({
+                            onValueChange={(value) => setPaymentDetails(prev => ({
                               ...prev,
-                              [field.key]: e.target.value
+                              [field.key]: value
                             }))}
-                          />
+                          >
+                            <SelectTrigger id={field.key}>
+                              <SelectValue placeholder={field.placeholder} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {field.networks.map((network) => (
+                                <SelectItem key={network.value} value={network.value}>
+                                  {network.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         ) : (
                           <Input
                             id={field.key}
