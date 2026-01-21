@@ -93,7 +93,7 @@ const Dashboard = () => {
       // Fetch investments
       const { data: investments } = await supabase
         .from("user_investments")
-        .select("amount, status, expected_return, created_at")
+        .select("amount, status, accrued_profit, created_at")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
@@ -106,7 +106,11 @@ const Dashboard = () => {
       const totalDeposited = approvedDeposits.reduce((sum, d) => sum + Number(d.amount), 0);
       const totalWithdrawn = approvedWithdrawals.reduce((sum, w) => sum + Number(w.amount), 0);
       const investedAmount = activeInvests.reduce((sum, i) => sum + Number(i.amount), 0);
-      const returnedAmount = completedInvests.reduce((sum, i) => sum + Number(i.expected_return || 0), 0);
+      
+      // Use same formula as DB function: principal + accrued_profit for completed investments
+      const completedPrincipal = completedInvests.reduce((sum, i) => sum + Number(i.amount), 0);
+      const completedProfit = completedInvests.reduce((sum, i) => sum + Number(i.accrued_profit || 0), 0);
+      const returnedAmount = completedPrincipal + completedProfit;
 
       const balance = totalDeposited - totalWithdrawn - investedAmount + returnedAmount;
 
