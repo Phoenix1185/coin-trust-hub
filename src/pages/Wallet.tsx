@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useBTCPrice } from "@/hooks/useBTCPrice";
 import DashboardLayout from "@/components/DashboardLayout";
 import ActiveInvestmentSummary from "@/components/ActiveInvestmentSummary";
+import BalanceBreakdown from "@/components/BalanceBreakdown";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -77,8 +78,13 @@ const Wallet = () => {
       const totalWithdrawn = approvedWithdrawals.reduce((sum, w) => sum + Number(w.amount), 0);
       const investedAmount = activeInvests.reduce((sum, i) => sum + Number(i.amount), 0);
       const lockedProfit = activeInvests.reduce((sum, i) => sum + Number(i.accrued_profit || 0), 0);
-      const returnedAmount = completedInvests.reduce((sum, i) => sum + Number(i.actual_return || i.expected_return || 0), 0);
+      
+      // Use same formula as DB function: principal + accrued_profit for completed investments
+      const completedPrincipal = completedInvests.reduce((sum, i) => sum + Number(i.amount), 0);
+      const completedProfit = completedInvests.reduce((sum, i) => sum + Number(i.accrued_profit || 0), 0);
+      const returnedAmount = completedPrincipal + completedProfit;
 
+      // Formula: deposits - withdrawals - locked + returned (principal + profit)
       const calculatedBalance = totalDeposited - totalWithdrawn - investedAmount + returnedAmount;
       
       setWalletData({
@@ -253,6 +259,9 @@ const Wallet = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Balance Breakdown */}
+        <BalanceBreakdown />
 
         {/* Active Investment Summary */}
         <ActiveInvestmentSummary />
