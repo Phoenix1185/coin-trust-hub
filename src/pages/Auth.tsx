@@ -45,11 +45,22 @@ const Auth = () => {
   const [loginPassword, setLoginPassword] = useState("");
   
   // Signup form state
-  const [signupName, setSignupName] = useState("");
+  const [signupFirstName, setSignupFirstName] = useState("");
+  const [signupMiddleName, setSignupMiddleName] = useState("");
+  const [signupSurname, setSignupSurname] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
+  const [signupDob, setSignupDob] = useState("");
+  const [signupCountry, setSignupCountry] = useState("");
   const [signupCurrency, setSignupCurrency] = useState<CurrencyCode>("USD");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+
+  const COUNTRIES = [
+    "United States", "United Kingdom", "Canada", "Australia", "Germany", "France",
+    "Netherlands", "Switzerland", "Singapore", "Japan", "South Korea", "Brazil",
+    "India", "Nigeria", "South Africa", "United Arab Emirates", "Other"
+  ];
 
   // Initialize countdown timers from localStorage
   useEffect(() => {
@@ -158,8 +169,17 @@ const Auth = () => {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate required fields
+    if (!signupFirstName.trim() || !signupSurname.trim()) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter your first name and surname.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
-      nameSchema.parse(signupName);
       emailSchema.parse(signupEmail);
       passwordSchema.parse(signupPassword);
     } catch (err) {
@@ -181,10 +201,68 @@ const Auth = () => {
       });
       return;
     }
+
+    if (!signupDob) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter your date of birth.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!signupCountry) {
+      toast({
+        title: "Missing Information",
+        description: "Please select your country.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!acceptedTerms) {
+      toast({
+        title: "Terms Required",
+        description: "Please accept the terms and conditions.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Age verification (must be 18+)
+    const dob = new Date(signupDob);
+    const today = new Date();
+    const age = today.getFullYear() - dob.getFullYear();
+    const monthDiff = today.getMonth() - dob.getMonth();
+    if (age < 18 || (age === 18 && monthDiff < 0)) {
+      toast({
+        title: "Age Requirement",
+        description: "You must be at least 18 years old to register.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     setIsSubmitting(true);
     
-    const { error } = await signUp(signupEmail, signupPassword, signupName, signupCurrency);
+    const fullName = [signupFirstName, signupMiddleName, signupSurname].filter(Boolean).join(" ");
+    
+    // Use supabase directly to include extended fields
+    const { error } = await supabase.auth.signUp({
+      email: signupEmail,
+      password: signupPassword,
+      options: {
+        data: {
+          full_name: fullName,
+          first_name: signupFirstName,
+          middle_name: signupMiddleName || null,
+          surname: signupSurname,
+          date_of_birth: signupDob,
+          country: signupCountry,
+          preferred_currency: signupCurrency,
+        },
+      },
+    });
     
     if (error) {
       const errorMessage = error.message.includes("already registered")
@@ -580,23 +658,85 @@ const Auth = () => {
 
             <TabsContent value="signup">
               <form onSubmit={handleSignup} className="space-y-4">
+                {/* Name Fields */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-firstname">First Name *</Label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="signup-firstname"
+                        type="text"
+                        placeholder="John"
+                        value={signupFirstName}
+                        onChange={(e) => setSignupFirstName(e.target.value)}
+                        className="pl-10"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-middlename">Middle Name</Label>
+                    <Input
+                      id="signup-middlename"
+                      type="text"
+                      placeholder="Optional"
+                      value={signupMiddleName}
+                      onChange={(e) => setSignupMiddleName(e.target.value)}
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="signup-name">Full Name</Label>
+                  <Label htmlFor="signup-surname">Surname *</Label>
                   <div className="relative">
                     <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
-                      id="signup-name"
+                      id="signup-surname"
                       type="text"
-                      placeholder="John Doe"
-                      value={signupName}
-                      onChange={(e) => setSignupName(e.target.value)}
+                      placeholder="Doe"
+                      value={signupSurname}
+                      onChange={(e) => setSignupSurname(e.target.value)}
                       className="pl-10"
                       required
                     />
                   </div>
                 </div>
+
+                {/* Date of Birth */}
                 <div className="space-y-2">
-                  <Label htmlFor="signup-email">Email</Label>
+                  <Label htmlFor="signup-dob">Date of Birth *</Label>
+                  <Input
+                    id="signup-dob"
+                    type="date"
+                    value={signupDob}
+                    onChange={(e) => setSignupDob(e.target.value)}
+                    max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">You must be 18+ to register</p>
+                </div>
+
+                {/* Country */}
+                <div className="space-y-2">
+                  <Label htmlFor="signup-country">Country *</Label>
+                  <Select value={signupCountry} onValueChange={setSignupCountry}>
+                    <SelectTrigger id="signup-country">
+                      <SelectValue placeholder="Select your country" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COUNTRIES.map((country) => (
+                        <SelectItem key={country} value={country}>
+                          {country}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Email */}
+                <div className="space-y-2">
+                  <Label htmlFor="signup-email">Email *</Label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -610,8 +750,25 @@ const Auth = () => {
                     />
                   </div>
                 </div>
+
+                {/* Currency */}
                 <div className="space-y-2">
-                  <Label htmlFor="signup-password">Password</Label>
+                  <Label htmlFor="signup-currency">Preferred Currency</Label>
+                  <Select value={signupCurrency} onValueChange={(val) => setSignupCurrency(val as CurrencyCode)}>
+                    <SelectTrigger id="signup-currency">
+                      <SelectValue placeholder="Select currency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="USD">$ US Dollar (USD)</SelectItem>
+                      <SelectItem value="EUR">€ Euro (EUR)</SelectItem>
+                      <SelectItem value="GBP">£ British Pound (GBP)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Password */}
+                <div className="space-y-2">
+                  <Label htmlFor="signup-password">Password *</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -631,9 +788,12 @@ const Auth = () => {
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
+                  <p className="text-xs text-muted-foreground">Minimum 6 characters</p>
                 </div>
+
+                {/* Confirm Password */}
                 <div className="space-y-2">
-                  <Label htmlFor="signup-confirm-password">Confirm Password</Label>
+                  <Label htmlFor="signup-confirm-password">Confirm Password *</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -647,22 +807,28 @@ const Auth = () => {
                     />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-currency">Preferred Currency</Label>
-                  <Select value={signupCurrency} onValueChange={(val) => setSignupCurrency(val as CurrencyCode)}>
-                    <SelectTrigger id="signup-currency">
-                      <SelectValue placeholder="Select currency" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="USD">$ US Dollar (USD)</SelectItem>
-                      <SelectItem value="EUR">€ Euro (EUR)</SelectItem>
-                      <SelectItem value="GBP">£ British Pound (GBP)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    This will be your primary display currency
-                  </p>
+
+                {/* Terms Checkbox */}
+                <div className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    id="terms"
+                    checked={acceptedTerms}
+                    onChange={(e) => setAcceptedTerms(e.target.checked)}
+                    className="mt-1"
+                  />
+                  <label htmlFor="terms" className="text-sm text-muted-foreground">
+                    I agree to the{" "}
+                    <Link to="/terms-of-service" className="text-primary hover:underline">
+                      Terms of Service
+                    </Link>{" "}
+                    and{" "}
+                    <Link to="/privacy-policy" className="text-primary hover:underline">
+                      Privacy Policy
+                    </Link>
+                  </label>
                 </div>
+
                 <Button
                   type="submit"
                   className="w-full bg-primary text-primary-foreground hover:bg-primary/90"

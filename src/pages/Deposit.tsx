@@ -288,11 +288,11 @@ const Deposit = () => {
               )}
 
               {/* Show deposit address for crypto methods */}
-              {selectedPaymentMethod?.icon === "bitcoin" && depositAddress && (
+              {selectedPaymentMethod?.icon === "bitcoin" && (depositAddress || selectedPaymentMethod.wallet_address) && (
                 <div className="mt-4 space-y-4">
                   <div className="flex justify-center p-4 bg-white rounded-lg">
                     <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${depositAddress.address}`}
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${selectedPaymentMethod.wallet_address || depositAddress?.address}`}
                       alt="QR Code"
                       className="w-40 h-40"
                     />
@@ -301,14 +301,14 @@ const Deposit = () => {
                     <Label>BTC Address</Label>
                     <div className="flex gap-2">
                       <Input
-                        value={depositAddress.address}
+                        value={selectedPaymentMethod.wallet_address || depositAddress?.address || ""}
                         readOnly
                         className="font-mono text-sm"
                       />
                       <Button
                         variant="outline"
                         size="icon"
-                        onClick={() => handleCopyAddress(depositAddress.address)}
+                        onClick={() => handleCopyAddress(selectedPaymentMethod.wallet_address || depositAddress?.address || "")}
                       >
                         {copied ? (
                           <CheckCircle className="w-4 h-4 text-success" />
@@ -321,8 +321,8 @@ const Deposit = () => {
                 </div>
               )}
 
-              {/* Show wallet address for USDT */}
-              {selectedPaymentMethod?.icon === "usdt" && selectedPaymentMethod.wallet_address && (
+              {/* Show wallet address for USDT/USDC */}
+              {(selectedPaymentMethod?.icon === "usdt" || selectedPaymentMethod?.icon === "usdc") && selectedPaymentMethod.wallet_address && (
                 <div className="mt-4 space-y-4">
                   <div className="flex justify-center p-4 bg-white rounded-lg">
                     <img
@@ -332,7 +332,7 @@ const Deposit = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>USDT (BEP20) Address</Label>
+                    <Label>{selectedPaymentMethod.name} Address</Label>
                     <div className="flex gap-2">
                       <Input
                         value={selectedPaymentMethod.wallet_address}
@@ -352,13 +352,55 @@ const Deposit = () => {
                       </Button>
                     </div>
                   </div>
+                  {selectedPaymentMethod.instructions && (
+                    <div className="p-3 bg-warning/10 border border-warning/20 rounded-lg">
+                      <p className="text-sm text-warning">{selectedPaymentMethod.instructions}</p>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Show instructions for other methods */}
-              {selectedPaymentMethod?.instructions && (
-                <div className="mt-4 p-4 bg-muted/50 rounded-lg">
-                  <p className="text-sm">{selectedPaymentMethod.instructions}</p>
+              {/* Show no address message for crypto without address */}
+              {(selectedPaymentMethod?.icon === "usdt" || selectedPaymentMethod?.icon === "usdc") && !selectedPaymentMethod.wallet_address && (
+                <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                  <p className="text-sm text-destructive">No deposit address configured for this payment method. Please contact support.</p>
+                </div>
+              )}
+
+              {/* Show PayPal instructions */}
+              {selectedPaymentMethod?.icon === "paypal" && (
+                <div className="mt-4 space-y-3">
+                  {selectedPaymentMethod.wallet_address && (
+                    <div className="space-y-2">
+                      <Label>PayPal Email</Label>
+                      <div className="flex gap-2">
+                        <Input value={selectedPaymentMethod.wallet_address} readOnly className="font-mono text-sm" />
+                        <Button variant="outline" size="icon" onClick={() => handleCopyAddress(selectedPaymentMethod.wallet_address!)}>
+                          {copied ? <CheckCircle className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  {selectedPaymentMethod.instructions && (
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <p className="text-sm">{selectedPaymentMethod.instructions}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Show Bank Transfer instructions */}
+              {selectedPaymentMethod?.icon === "bank" && (
+                <div className="mt-4 space-y-3">
+                  {selectedPaymentMethod.instructions ? (
+                    <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-line">
+                      <p className="text-sm">{selectedPaymentMethod.instructions}</p>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-warning/10 border border-warning/20 rounded-lg">
+                      <p className="text-sm text-warning">Bank transfer details not configured. Please contact support.</p>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>

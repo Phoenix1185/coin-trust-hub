@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -800,7 +801,40 @@ const Admin = () => {
     }
   };
 
-  // Deposit Address Actions
+  // Manual Settlement Trigger
+  const [isRunningSettlement, setIsRunningSettlement] = useState(false);
+  const [lastSettlementResult, setLastSettlementResult] = useState<{ settlementsProcessed: number; completionsProcessed: number } | null>(null);
+
+  const handleRunSettlement = async () => {
+    setIsRunningSettlement(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("settlement-engine", {
+        body: { trigger: "manual" },
+      });
+
+      if (error) throw error;
+
+      await logAdminAction("manual_settlement", "settlement", undefined, data);
+
+      setLastSettlementResult({
+        settlementsProcessed: data?.settlementsProcessed || 0,
+        completionsProcessed: data?.completionsProcessed || 0,
+      });
+
+      toast({
+        title: "Settlement Complete",
+        description: `Processed ${data?.settlementsProcessed || 0} settlements and ${data?.completionsProcessed || 0} completions.`,
+      });
+      
+      fetchAllData();
+    } catch (error) {
+      console.error("Error running settlement:", error);
+      toast({ title: "Error", description: "Failed to run settlement engine.", variant: "destructive" });
+    } finally {
+      setIsRunningSettlement(false);
+    }
+  };
+
   const handleSaveAddress = async () => {
     try {
       if (editingAddress) {
@@ -1458,12 +1492,29 @@ const Admin = () => {
           {/* Investments Tab */}
           <TabsContent value="investments">
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
-                  <TrendingUp className="w-5 h-5 text-primary" />
-                  Investments
-                </CardTitle>
-                <CardDescription>Manage user investments</CardDescription>
+              <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+                    <TrendingUp className="w-5 h-5 text-primary" />
+                    Investments
+                  </CardTitle>
+                  <CardDescription>Manage user investments</CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  {lastSettlementResult && (
+                    <span className="text-xs text-muted-foreground">
+                      Last run: {lastSettlementResult.settlementsProcessed}S / {lastSettlementResult.completionsProcessed}C
+                    </span>
+                  )}
+                  <Button 
+                    variant="outline" 
+                    onClick={handleRunSettlement} 
+                    disabled={isRunningSettlement}
+                  >
+                    <RefreshCw className={cn("w-4 h-4 mr-2", isRunningSettlement && "animate-spin")} />
+                    {isRunningSettlement ? "Running..." : "Run Settlement"}
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {isLoading ? (
