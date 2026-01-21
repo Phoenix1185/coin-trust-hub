@@ -8,6 +8,7 @@ const corsHeaders = {
 interface InvestmentPlan {
   name: string;
   duration_days: number;
+  duration_hours: number | null;
   roi_percentage: number;
 }
 
@@ -56,6 +57,7 @@ Deno.serve(async (req) => {
         investment_plans (
           name,
           duration_days,
+          duration_hours,
           roi_percentage
         )
       `)
@@ -93,36 +95,41 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      const planDays = planData.duration_days || 1;
+      // Determine if this is an hour-based or day-based plan
+      const isHourPlan = planData.duration_hours !== null && planData.duration_hours > 0;
+      const planDuration = isHourPlan ? (planData.duration_hours as number) : (planData.duration_days || 1);
+      const settlementIntervalHours = isHourPlan ? 1 : 24; // 1 hour for hour plans, 24 hours for day plans
+      
       const settlementCount = investment.settlement_count || 0;
       const lastSettlement = new Date(investment.last_settlement_at || investment.activated_at);
       
       // Calculate hours since last settlement
       const hoursSinceLastSettlement = (now.getTime() - lastSettlement.getTime()) / (1000 * 60 * 60);
       
-      console.log(`[Settlement Engine] Investment ${investment.id}: ${hoursSinceLastSettlement.toFixed(2)}h since last settlement, count: ${settlementCount}/${planDays}`);
+      console.log(`[Settlement Engine] Investment ${investment.id}: ${hoursSinceLastSettlement.toFixed(2)}h since last settlement, count: ${settlementCount}/${planDuration} (${isHourPlan ? 'hour' : 'day'} plan)`);
 
-      // Check if 24 hours have passed since last settlement
-      if (hoursSinceLastSettlement >= 24) {
+      // Check if enough time has passed for next settlement
+      if (hoursSinceLastSettlement >= settlementIntervalHours) {
         // Calculate how many settlements are due (in case engine was down)
-        const settlementsDue = Math.floor(hoursSinceLastSettlement / 24);
-        const settlementsToProcess = Math.min(settlementsDue, planDays - settlementCount);
+        const settlementsDue = Math.floor(hoursSinceLastSettlement / settlementIntervalHours);
+        const settlementsToProcess = Math.min(settlementsDue, planDuration - settlementCount);
 
         if (settlementsToProcess <= 0) {
           console.log(`[Settlement Engine] Investment ${investment.id}: No settlements needed`);
           continue;
         }
 
-        // Calculate daily profit
+        // Calculate profit per settlement period
         const totalProfit = investment.total_profit || (investment.amount * (planData.roi_percentage || 0) / 100);
-        const dailyProfit = totalProfit / planDays;
-        const profitToAdd = dailyProfit * settlementsToProcess;
+        const profitPerPeriod = totalProfit / planDuration;
+        const profitToAdd = profitPerPeriod * settlementsToProcess;
         
         const newAccruedProfit = (investment.accrued_profit || 0) + profitToAdd;
         const newSettlementCount = settlementCount + settlementsToProcess;
-        const isCompleting = newSettlementCount >= planDays;
+        const isCompleting = newSettlementCount >= planDuration;
 
-        console.log(`[Settlement Engine] Investment ${investment.id}: Processing ${settlementsToProcess} settlement(s), adding ${profitToAdd.toFixed(8)} BTC`);
+        const periodLabel = isHourPlan ? "hour" : "day";
+        console.log(`[Settlement Engine] Investment ${investment.id}: Processing ${settlementsToProcess} ${periodLabel}(s), adding ${profitToAdd.toFixed(8)} BTC`);
 
         if (isCompleting) {
           // Investment is complete - update with final values
@@ -132,7 +139,7 @@ Deno.serve(async (req) => {
             .from("user_investments")
             .update({
               status: "completed",
-              settlement_count: planDays,
+              settlement_count: planDuration,
               accrued_profit: newAccruedProfit,
               last_settlement_at: now.toISOString(),
               actual_return: actualReturn,
@@ -173,24 +180,25 @@ Deno.serve(async (req) => {
 
           // Insert settlement notification for user
           const planName = planData.name || "Investment";
+          const durationLabel = isHourPlan ? `Hour ${newSettlementCount}/${planDuration}` : `Day ${newSettlementCount}/${planDuration}`;
           await supabase.from("notifications").insert({
             user_id: investment.user_id,
             type: "settlement",
-            title: "Daily Profit Settled",
-            message: `Day ${newSettlementCount}/${planDays}: +${dailyProfit.toFixed(8)} BTC from your ${planName}. Total accrued: ${newAccruedProfit.toFixed(8)} BTC (locked until completion)`,
+            title: `${isHourPlan ? 'Hourly' : 'Daily'} Profit Settled`,
+            message: `${durationLabel}: +${profitPerPeriod.toFixed(8)} BTC from your ${planName}. Total accrued: ${newAccruedProfit.toFixed(8)} BTC (locked until completion)`,
           });
 
-          console.log(`[Settlement Engine] Investment ${investment.id}: Settled day ${newSettlementCount}/${planDays}`);
+          console.log(`[Settlement Engine] Investment ${investment.id}: Settled ${periodLabel} ${newSettlementCount}/${planDuration}`);
           
           settlementsProcessed++;
           results.push({ 
             id: investment.id, 
             action: "settled", 
-            details: `Day ${newSettlementCount}/${planDays}, Daily: +${dailyProfit.toFixed(8)} BTC, Total: ${newAccruedProfit.toFixed(8)} BTC` 
+            details: `${durationLabel}, ${isHourPlan ? 'Hourly' : 'Daily'}: +${profitPerPeriod.toFixed(8)} BTC, Total: ${newAccruedProfit.toFixed(8)} BTC` 
           });
         }
       } else {
-        const hoursUntilNext = 24 - hoursSinceLastSettlement;
+        const hoursUntilNext = settlementIntervalHours - hoursSinceLastSettlement;
         console.log(`[Settlement Engine] Investment ${investment.id}: ${hoursUntilNext.toFixed(2)}h until next settlement`);
       }
     }

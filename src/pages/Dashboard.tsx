@@ -42,7 +42,7 @@ const Dashboard = () => {
   const { user, profile, isLoading } = useAuth();
   const navigate = useNavigate();
   const { formatBTC, formatWithBTC, btcToUSD, formatFiatAmount } = useBTCPrice();
-  const { balance } = useBalance();
+  const { mainBalance, investmentBalance } = useBalance();
   const currency = profile?.preferred_currency || "USD";
   
   const displayName = profile?.full_name || user?.email?.split("@")[0] || "User";
@@ -192,9 +192,9 @@ const Dashboard = () => {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs text-muted-foreground">Available Balance</p>
-                  <p className="text-base sm:text-lg font-bold text-primary truncate">{formatFiatAmount(btcToUSD(balance), currency)}</p>
-                  <p className="text-xs text-muted-foreground">{formatBTC(balance)}</p>
+                  <p className="text-xs text-muted-foreground">Main Balance</p>
+                  <p className="text-base sm:text-lg font-bold text-primary truncate">{formatFiatAmount(btcToUSD(mainBalance), currency)}</p>
+                  <p className="text-xs text-muted-foreground">{formatBTC(mainBalance)}</p>
                 </div>
                 <div className="p-2 bg-primary/20 rounded-full ml-2">
                   <Wallet className="w-5 h-5 text-primary" />

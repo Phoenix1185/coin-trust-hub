@@ -169,6 +169,7 @@ export type Database = {
           created_at: string
           description: string | null
           duration_days: number
+          duration_hours: number | null
           id: string
           is_active: boolean | null
           max_amount: number
@@ -181,6 +182,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           duration_days: number
+          duration_hours?: number | null
           id?: string
           is_active?: boolean | null
           max_amount: number
@@ -193,6 +195,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           duration_days?: number
+          duration_hours?: number | null
           id?: string
           is_active?: boolean | null
           max_amount?: number

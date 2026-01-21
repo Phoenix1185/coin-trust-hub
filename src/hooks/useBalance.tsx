@@ -3,23 +3,26 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 
 interface BalanceData {
-  balance: number;
-  lockedCapital: number;
-  lockedProfit: number;
+  mainBalance: number;       // Available for withdrawal/investment
+  investmentBalance: number; // Locked in active plans (capital + accrued profit)
+  lockedCapital: number;     // Just the principal in active plans
+  lockedProfit: number;      // Accrued profit in active plans (locked until completion)
   isLoading: boolean;
   refetch: () => Promise<void>;
 }
 
 export const useBalance = (): BalanceData => {
   const { user } = useAuth();
-  const [balance, setBalance] = useState(0);
+  const [mainBalance, setMainBalance] = useState(0);
+  const [investmentBalance, setInvestmentBalance] = useState(0);
   const [lockedCapital, setLockedCapital] = useState(0);
   const [lockedProfit, setLockedProfit] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchBalance = useCallback(async () => {
     if (!user) {
-      setBalance(0);
+      setMainBalance(0);
+      setInvestmentBalance(0);
       setLockedCapital(0);
       setLockedProfit(0);
       setIsLoading(false);
@@ -27,7 +30,7 @@ export const useBalance = (): BalanceData => {
     }
 
     try {
-      // Use the database function for accurate balance (single source of truth)
+      // Use the database function for accurate main balance (single source of truth)
       const [balanceRes, investmentsRes] = await Promise.all([
         supabase.rpc("get_user_balance", { _user_id: user.id }),
         supabase
@@ -38,13 +41,17 @@ export const useBalance = (): BalanceData => {
       ]);
 
       if (!balanceRes.error && balanceRes.data !== null) {
-        setBalance(Math.max(0, Number(balanceRes.data)));
+        setMainBalance(Math.max(0, Number(balanceRes.data)));
       }
 
       if (!investmentsRes.error && investmentsRes.data) {
         const activeInvests = investmentsRes.data;
-        setLockedCapital(activeInvests.reduce((sum, i) => sum + Number(i.amount), 0));
-        setLockedProfit(activeInvests.reduce((sum, i) => sum + Number(i.accrued_profit || 0), 0));
+        const capital = activeInvests.reduce((sum, i) => sum + Number(i.amount), 0);
+        const profit = activeInvests.reduce((sum, i) => sum + Number(i.accrued_profit || 0), 0);
+        
+        setLockedCapital(capital);
+        setLockedProfit(profit);
+        setInvestmentBalance(capital + profit); // Total locked in investments
       }
     } catch (error) {
       console.error("Error fetching balance:", error);
@@ -109,7 +116,8 @@ export const useBalance = (): BalanceData => {
   }, [user, fetchBalance]);
 
   return {
-    balance,
+    mainBalance,
+    investmentBalance,
     lockedCapital,
     lockedProfit,
     isLoading,
