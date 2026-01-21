@@ -1726,33 +1726,6 @@ const Admin = () => {
                       </div>
                     ))}
                   </div>
-                    {tickets.map((ticket) => (
-                      <div key={ticket.id} className="p-4 bg-muted/30 rounded-lg space-y-3">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-medium">{ticket.subject}</span>
-                              {getStatusBadge(ticket.status)}
-                            </div>
-                            <p className="text-sm text-muted-foreground">{ticket.profiles?.email || "Unknown"}</p>
-                            <p className="text-xs text-muted-foreground">{formatDate(ticket.created_at)}</p>
-                          </div>
-                          {ticket.status === "open" && (
-                            <Button size="sm" onClick={() => { setSelectedTicket(ticket); setReplyDialogOpen(true); }}>
-                              <Reply className="w-4 h-4 mr-1" />Reply
-                            </Button>
-                          )}
-                        </div>
-                        <p className="text-sm bg-muted/50 p-3 rounded">{ticket.message}</p>
-                        {ticket.response && (
-                          <div className="bg-primary/10 p-3 rounded">
-                            <p className="text-xs font-medium text-primary mb-1">Admin Response:</p>
-                            <p className="text-sm">{ticket.response}</p>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
                 )}
               </CardContent>
             </Card>
