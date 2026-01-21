@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useBTCPrice } from "@/hooks/useBTCPrice";
+import { useBalance } from "@/hooks/useBalance";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -116,6 +117,7 @@ const Withdraw = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { formatBTC, btcToUSD, usdToBTC, formatFiatAmount, getCurrencySymbol } = useBTCPrice();
+  const { balance, refetch: refetchBalance } = useBalance();
   const currency = profile?.preferred_currency || "USD";
   
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
@@ -123,7 +125,6 @@ const Withdraw = () => {
   const [selectedMethod, setSelectedMethod] = useState<string>("");
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [settings, setSettings] = useState<WithdrawalSettings | null>(null);
-  const [balance, setBalance] = useState(0);
   const [amount, setAmount] = useState("");
   const [paymentDetails, setPaymentDetails] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -175,10 +176,9 @@ const Withdraw = () => {
   const fetchData = useCallback(async () => {
     if (!user) return;
 
-    const [settingsRes, withdrawalsRes, balanceRes, investmentsRes] = await Promise.all([
+    const [settingsRes, withdrawalsRes, investmentsRes] = await Promise.all([
       supabase.from("withdrawal_settings").select("*").limit(1).maybeSingle(),
       supabase.from("withdrawals").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
-      supabase.rpc("get_user_balance", { _user_id: user.id }),
       supabase.from("user_investments").select("created_at").eq("user_id", user.id).eq("status", "active").order("created_at", { ascending: true }).limit(1),
     ]);
 
@@ -194,10 +194,6 @@ const Withdraw = () => {
         ...w,
         amount: Number(w.amount),
       })));
-    }
-
-    if (balanceRes.data !== null) {
-      setBalance(Math.max(0, Number(balanceRes.data)));
     }
 
     let minDays = settingsRes.data?.min_investment_days ?? 7;
@@ -394,6 +390,7 @@ const Withdraw = () => {
       });
       setAmount("");
       setDataLoaded(false);
+      refetchBalance();
     }
 
     setIsSubmitting(false);

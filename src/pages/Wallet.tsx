@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useBTCPrice } from "@/hooks/useBTCPrice";
+import { useBalance } from "@/hooks/useBalance";
 import DashboardLayout from "@/components/DashboardLayout";
 import ActiveInvestmentSummary from "@/components/ActiveInvestmentSummary";
 import BalanceBreakdown from "@/components/BalanceBreakdown";
@@ -20,18 +21,12 @@ interface Transaction {
   created_at: string;
 }
 
-interface WalletData {
-  balance: number;
-  lockedProfit: number;
-  lockedCapital: number;
-}
-
 const Wallet = () => {
   const { user, profile, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { btcPrice, formatBTC, btcToUSD, formatFiatAmount, isLoading: priceLoading } = useBTCPrice();
+  const { balance, lockedCapital, lockedProfit } = useBalance();
   const currency = profile?.preferred_currency || "USD";
-  const [walletData, setWalletData] = useState<WalletData>({ balance: 0, lockedProfit: 0, lockedCapital: 0 });
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -43,11 +38,11 @@ const Wallet = () => {
 
   useEffect(() => {
     if (user) {
-      fetchWalletData();
+      fetchTransactions();
     }
   }, [user]);
 
-  const fetchWalletData = async () => {
+  const fetchTransactions = async () => {
     if (!user) return;
     
     try {
@@ -64,34 +59,10 @@ const Wallet = () => {
           .order("created_at", { ascending: false }),
         supabase
           .from("user_investments")
-          .select("id, amount, status, expected_return, actual_return, accrued_profit, created_at")
+          .select("id, amount, status, created_at")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false }),
       ]);
-
-      const approvedDeposits = deposits.data?.filter(d => d.status === "approved") || [];
-      const approvedWithdrawals = withdrawals.data?.filter(w => w.status === "approved") || [];
-      const activeInvests = investments.data?.filter(i => i.status === "active" || i.status === "pending") || [];
-      const completedInvests = investments.data?.filter(i => i.status === "completed") || [];
-
-      const totalDeposited = approvedDeposits.reduce((sum, d) => sum + Number(d.amount), 0);
-      const totalWithdrawn = approvedWithdrawals.reduce((sum, w) => sum + Number(w.amount), 0);
-      const investedAmount = activeInvests.reduce((sum, i) => sum + Number(i.amount), 0);
-      const lockedProfit = activeInvests.reduce((sum, i) => sum + Number(i.accrued_profit || 0), 0);
-      
-      // Use same formula as DB function: principal + accrued_profit for completed investments
-      const completedPrincipal = completedInvests.reduce((sum, i) => sum + Number(i.amount), 0);
-      const completedProfit = completedInvests.reduce((sum, i) => sum + Number(i.accrued_profit || 0), 0);
-      const returnedAmount = completedPrincipal + completedProfit;
-
-      // Formula: deposits - withdrawals - locked + returned (principal + profit)
-      const calculatedBalance = totalDeposited - totalWithdrawn - investedAmount + returnedAmount;
-      
-      setWalletData({
-        balance: Math.max(0, calculatedBalance),
-        lockedProfit,
-        lockedCapital: investedAmount,
-      });
 
       const allTransactions: Transaction[] = [
         ...(deposits.data?.map((d) => ({ ...d, type: "deposit" as const })) || []),
@@ -101,7 +72,7 @@ const Wallet = () => {
 
       setTransactions(allTransactions.slice(0, 10));
     } catch (error) {
-      console.error("Error fetching wallet data:", error);
+      console.error("Error fetching transactions:", error);
     } finally {
       setIsLoading(false);
     }
@@ -183,10 +154,10 @@ const Wallet = () => {
               ) : (
                 <>
                   <div className="text-2xl md:text-3xl font-bold text-gradient-gold">
-                    {formatFiatAmount(btcToUSD(walletData.balance), currency)}
+                    {formatFiatAmount(btcToUSD(balance), currency)}
                   </div>
                   <div className="text-sm text-muted-foreground mt-1">
-                    {formatBTC(walletData.balance)}
+                    {formatBTC(balance)}
                   </div>
                 </>
               )}
@@ -206,10 +177,10 @@ const Wallet = () => {
               ) : (
                 <>
                   <div className="text-2xl md:text-3xl font-bold text-success">
-                    +{formatFiatAmount(btcToUSD(walletData.lockedProfit), currency)}
+                    +{formatFiatAmount(btcToUSD(lockedProfit), currency)}
                   </div>
                   <div className="text-sm text-muted-foreground mt-1">
-                    {formatBTC(walletData.lockedProfit)} (locked)
+                    {formatBTC(lockedProfit)} (locked)
                   </div>
                 </>
               )}

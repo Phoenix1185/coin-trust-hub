@@ -1,32 +1,10 @@
-import { useEffect, useState } from "react";
-import { useAuth } from "@/hooks/useAuth";
 import { useBTCPrice } from "@/hooks/useBTCPrice";
-import { supabase } from "@/integrations/supabase/client";
+import { useBalance } from "@/hooks/useBalance";
 import { Wallet } from "lucide-react";
 
 export const MobileBalanceWidget = () => {
-  const { user } = useAuth();
   const { formatBTC, formatUSD } = useBTCPrice();
-  const [balance, setBalance] = useState(0);
-
-  useEffect(() => {
-    if (user) {
-      fetchBalance();
-    }
-  }, [user]);
-
-  const fetchBalance = async () => {
-    if (!user) return;
-
-    // Use the database function for accurate balance
-    const { data, error } = await supabase.rpc("get_user_balance", {
-      _user_id: user.id,
-    });
-
-    if (!error && data !== null) {
-      setBalance(Math.max(0, Number(data)));
-    }
-  };
+  const { balance } = useBalance();
 
   return (
     <div className="bg-gradient-to-r from-primary/10 to-primary/5 border-b border-primary/20 py-2 px-4 sm:hidden">

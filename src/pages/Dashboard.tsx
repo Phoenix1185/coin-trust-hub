@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useBTCPrice } from "@/hooks/useBTCPrice";
+import { useBalance } from "@/hooks/useBalance";
 import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
 import DashboardLayout from "@/components/DashboardLayout";
 import CryptoChart from "@/components/CryptoChart";
@@ -22,7 +23,6 @@ import {
 import { cn } from "@/lib/utils";
 
 interface DashboardStats {
-  balance: number;
   totalDeposits: number;
   totalWithdrawals: number;
   activeInvestments: number;
@@ -42,6 +42,7 @@ const Dashboard = () => {
   const { user, profile, isLoading } = useAuth();
   const navigate = useNavigate();
   const { formatBTC, formatWithBTC, btcToUSD, formatFiatAmount } = useBTCPrice();
+  const { balance } = useBalance();
   const currency = profile?.preferred_currency || "USD";
   
   const displayName = profile?.full_name || user?.email?.split("@")[0] || "User";
@@ -50,7 +51,6 @@ const Dashboard = () => {
   useRealtimeNotifications();
   
   const [stats, setStats] = useState<DashboardStats>({
-    balance: 0,
     totalDeposits: 0,
     totalWithdrawals: 0,
     activeInvestments: 0,
@@ -101,21 +101,11 @@ const Dashboard = () => {
       const approvedDeposits = deposits?.filter(d => d.status === "approved") || [];
       const approvedWithdrawals = withdrawals?.filter(w => w.status === "approved") || [];
       const activeInvests = investments?.filter(i => i.status === "active" || i.status === "pending") || [];
-      const completedInvests = investments?.filter(i => i.status === "completed") || [];
 
       const totalDeposited = approvedDeposits.reduce((sum, d) => sum + Number(d.amount), 0);
       const totalWithdrawn = approvedWithdrawals.reduce((sum, w) => sum + Number(w.amount), 0);
-      const investedAmount = activeInvests.reduce((sum, i) => sum + Number(i.amount), 0);
-      
-      // Use same formula as DB function: principal + accrued_profit for completed investments
-      const completedPrincipal = completedInvests.reduce((sum, i) => sum + Number(i.amount), 0);
-      const completedProfit = completedInvests.reduce((sum, i) => sum + Number(i.accrued_profit || 0), 0);
-      const returnedAmount = completedPrincipal + completedProfit;
-
-      const balance = totalDeposited - totalWithdrawn - investedAmount + returnedAmount;
 
       setStats({
-        balance: Math.max(0, balance),
         totalDeposits: totalDeposited,
         totalWithdrawals: totalWithdrawn,
         activeInvestments: activeInvests.length,
@@ -203,8 +193,8 @@ const Dashboard = () => {
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-muted-foreground">Available Balance</p>
-                  <p className="text-base sm:text-lg font-bold text-primary truncate">{formatFiatAmount(btcToUSD(stats.balance), currency)}</p>
-                  <p className="text-xs text-muted-foreground">{formatBTC(stats.balance)}</p>
+                  <p className="text-base sm:text-lg font-bold text-primary truncate">{formatFiatAmount(btcToUSD(balance), currency)}</p>
+                  <p className="text-xs text-muted-foreground">{formatBTC(balance)}</p>
                 </div>
                 <div className="p-2 bg-primary/20 rounded-full ml-2">
                   <Wallet className="w-5 h-5 text-primary" />

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useBTCPrice } from "@/hooks/useBTCPrice";
+import { useBalance } from "@/hooks/useBalance";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import InvestmentProgressCard from "@/components/InvestmentProgressCard";
-
 interface InvestmentPlan {
   id: string;
   name: string;
@@ -49,11 +49,11 @@ const Investments = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { formatBTC, btcPrice, btcToUSD, formatFiatAmount, fiatToBTC, getCurrencySymbol } = useBTCPrice();
+  const { balance, refetch: refetchBalance } = useBalance();
   const currency = (profile?.preferred_currency || "USD") as "USD" | "EUR" | "GBP";
   
   const [plans, setPlans] = useState<InvestmentPlan[]>([]);
   const [userInvestments, setUserInvestments] = useState<UserInvestment[]>([]);
-  const [balance, setBalance] = useState(0);
   const [selectedPlan, setSelectedPlan] = useState<InvestmentPlan | null>(null);
   const [investAmount, setInvestAmount] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -135,32 +135,6 @@ const Investments = () => {
         total_profit: i.total_profit ? Number(i.total_profit) : null,
       })));
     }
-
-    // Fetch balance
-    const { data: deposits } = await supabase
-      .from("deposits")
-      .select("amount, status")
-      .eq("user_id", user.id);
-
-    const { data: withdrawals } = await supabase
-      .from("withdrawals")
-      .select("amount, status")
-      .eq("user_id", user.id);
-
-    const { data: investments } = await supabase
-      .from("user_investments")
-      .select("amount, status")
-      .eq("user_id", user.id);
-
-    const approvedDeposits = deposits?.filter(d => d.status === "approved") || [];
-    const approvedWithdrawals = withdrawals?.filter(w => w.status === "approved") || [];
-    const activeInvestments = investments?.filter(i => i.status === "pending" || i.status === "active") || [];
-
-    const totalDeposited = approvedDeposits.reduce((sum, d) => sum + Number(d.amount), 0);
-    const totalWithdrawn = approvedWithdrawals.reduce((sum, w) => sum + Number(w.amount), 0);
-    const investedAmount = activeInvestments.reduce((sum, i) => sum + Number(i.amount), 0);
-
-    setBalance(Math.max(0, totalDeposited - totalWithdrawn - investedAmount));
   };
 
   const handleSelectPlan = (plan: InvestmentPlan) => {
@@ -244,6 +218,7 @@ const Investments = () => {
       setSelectedPlan(null);
       setInvestAmount("");
       fetchData();
+      refetchBalance();
     }
 
     setIsSubmitting(false);
