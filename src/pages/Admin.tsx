@@ -141,6 +141,7 @@ interface InvestmentPlan {
   name: string;
   description: string | null;
   duration_days: number;
+  duration_hours: number | null;
   min_amount: number;
   max_amount: number;
   roi_percentage: number;
@@ -309,11 +310,35 @@ const Admin = () => {
     name: "",
     description: "",
     duration_days: 30,
+    duration_hours: null as number | null,
+    duration_type: "days" as "days" | "hours",
     min_amount: 0.001,
     max_amount: 10,
     roi_percentage: 150,
     is_active: true,
   });
+
+  const openNewPlanDialog = () => {
+    setEditingPlan(null);
+    setPlanForm({ name: "", description: "", duration_days: 30, duration_hours: null, duration_type: "days", min_amount: 0.001, max_amount: 10, roi_percentage: 150, is_active: true });
+    setPlanDialogOpen(true);
+  };
+
+  const openEditPlanDialog = (plan: InvestmentPlan) => {
+    setEditingPlan(plan);
+    setPlanForm({
+      name: plan.name,
+      description: plan.description || "",
+      duration_days: plan.duration_days,
+      duration_hours: plan.duration_hours,
+      duration_type: plan.duration_hours ? "hours" : "days",
+      min_amount: plan.min_amount,
+      max_amount: plan.max_amount,
+      roi_percentage: plan.roi_percentage,
+      is_active: plan.is_active ?? true,
+    });
+    setPlanDialogOpen(true);
+  };
 
   const [userActivityDialogOpen, setUserActivityDialogOpen] = useState(false);
   const [selectedUserForActivity, setSelectedUserForActivity] = useState<User | null>(null);
@@ -903,13 +928,17 @@ const Admin = () => {
   // Investment Plan Actions
   const handleSavePlan = async () => {
     try {
+      const durationDays = planForm.duration_type === "days" ? planForm.duration_days : 0;
+      const durationHours = planForm.duration_type === "hours" ? planForm.duration_hours : null;
+
       if (editingPlan) {
         const { error } = await supabase
           .from("investment_plans")
           .update({
             name: planForm.name,
             description: planForm.description || null,
-            duration_days: planForm.duration_days,
+            duration_days: durationDays,
+            duration_hours: durationHours,
             min_amount: planForm.min_amount,
             max_amount: planForm.max_amount,
             roi_percentage: planForm.roi_percentage,
@@ -924,7 +953,8 @@ const Admin = () => {
         const { error } = await supabase.from("investment_plans").insert({
           name: planForm.name,
           description: planForm.description || null,
-          duration_days: planForm.duration_days,
+          duration_days: durationDays,
+          duration_hours: durationHours,
           min_amount: planForm.min_amount,
           max_amount: planForm.max_amount,
           roi_percentage: planForm.roi_percentage,
@@ -938,7 +968,7 @@ const Admin = () => {
 
       setPlanDialogOpen(false);
       setEditingPlan(null);
-      setPlanForm({ name: "", description: "", duration_days: 30, min_amount: 0.001, max_amount: 10, roi_percentage: 150, is_active: true });
+      setPlanForm({ name: "", description: "", duration_days: 30, duration_hours: null, duration_type: "days", min_amount: 0.001, max_amount: 10, roi_percentage: 150, is_active: true });
       fetchInvestmentPlans();
     } catch (error) {
       console.error("Error saving plan:", error);
@@ -1564,7 +1594,7 @@ const Admin = () => {
                   </CardTitle>
                   <CardDescription>Create and manage investment plans</CardDescription>
                 </div>
-                <Button onClick={() => { setEditingPlan(null); setPlanForm({ name: "", description: "", duration_days: 30, min_amount: 0.001, max_amount: 10, roi_percentage: 150, is_active: true }); setPlanDialogOpen(true); }}>
+                <Button onClick={openNewPlanDialog}>
                   <Plus className="w-4 h-4 mr-2" />Add Plan
                 </Button>
               </CardHeader>
@@ -1586,7 +1616,7 @@ const Admin = () => {
                           </div>
                           <p className="text-sm text-muted-foreground">{plan.description}</p>
                           <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-                            <span>Duration: {plan.duration_days} days</span>
+                            <span>Duration: {plan.duration_hours ? `${plan.duration_hours} hours` : `${plan.duration_days} days`}</span>
                             <span>ROI: {plan.roi_percentage}%</span>
                             <span>Min: {plan.min_amount} BTC</span>
                             <span>Max: {plan.max_amount} BTC</span>
@@ -1594,7 +1624,7 @@ const Admin = () => {
                         </div>
                         <div className="flex items-center gap-2">
                           <Switch checked={plan.is_active ?? false} onCheckedChange={() => handleTogglePlanActive(plan)} />
-                          <Button variant="ghost" size="icon" onClick={() => { setEditingPlan(plan); setPlanForm({ name: plan.name, description: plan.description || "", duration_days: plan.duration_days, min_amount: plan.min_amount, max_amount: plan.max_amount, roi_percentage: plan.roi_percentage, is_active: plan.is_active ?? true }); setPlanDialogOpen(true); }}>
+                          <Button variant="ghost" size="icon" onClick={() => openEditPlanDialog(plan)}>
                             <Edit className="w-4 h-4" />
                           </Button>
                           <Button variant="ghost" size="icon" onClick={() => handleDeletePlan(plan.id)}>
@@ -2378,19 +2408,35 @@ const Admin = () => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Duration (days)</Label>
-                <Input type="number" value={planForm.duration_days} onChange={(e) => setPlanForm({ ...planForm, duration_days: parseInt(e.target.value) || 30 })} min={1} />
+                <Label>Duration Type</Label>
+                <Select value={planForm.duration_type} onValueChange={(v: "days" | "hours") => setPlanForm({ ...planForm, duration_type: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="days">Days</SelectItem>
+                    <SelectItem value="hours">Hours</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
-                <Label>ROI (%)</Label>
-                <Input type="number" value={planForm.roi_percentage} onChange={(e) => setPlanForm({ ...planForm, roi_percentage: parseFloat(e.target.value) || 100 })} min={0} />
+                <Label>Duration ({planForm.duration_type})</Label>
+                {planForm.duration_type === "days" ? (
+                  <Input type="number" value={planForm.duration_days} onChange={(e) => setPlanForm({ ...planForm, duration_days: parseInt(e.target.value) || 1 })} min={1} />
+                ) : (
+                  <Input type="number" value={planForm.duration_hours || 1} onChange={(e) => setPlanForm({ ...planForm, duration_hours: parseInt(e.target.value) || 1 })} min={1} />
+                )}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
+                <Label>ROI (%)</Label>
+                <Input type="number" value={planForm.roi_percentage} onChange={(e) => setPlanForm({ ...planForm, roi_percentage: parseFloat(e.target.value) || 100 })} min={0} />
+              </div>
+              <div className="space-y-2">
                 <Label>Min Amount (BTC)</Label>
                 <Input type="number" step="0.0001" value={planForm.min_amount} onChange={(e) => setPlanForm({ ...planForm, min_amount: parseFloat(e.target.value) || 0.001 })} min={0} />
               </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Max Amount (BTC)</Label>
                 <Input type="number" step="0.0001" value={planForm.max_amount} onChange={(e) => setPlanForm({ ...planForm, max_amount: parseFloat(e.target.value) || 10 })} min={0} />

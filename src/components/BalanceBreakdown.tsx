@@ -20,7 +20,6 @@ interface BalanceComponents {
   totalDeposits: number;
   totalWithdrawals: number;
   lockedCapital: number;
-  completedPrincipal: number;
   completedProfit: number;
   availableBalance: number;
 }
@@ -67,17 +66,17 @@ export const BalanceBreakdown = () => {
       const completedInvestments = investments.data?.filter(i => i.status === "completed") || [];
       
       const lockedCapital = activeInvestments.reduce((sum, i) => sum + Number(i.amount), 0);
-      const completedPrincipal = completedInvestments.reduce((sum, i) => sum + Number(i.amount), 0);
       const completedProfit = completedInvestments.reduce((sum, i) => sum + Number(i.accrued_profit || 0), 0);
 
-      // Formula: deposits - withdrawals - locked + (completed principal + profit)
-      const availableBalance = totalDeposits - totalWithdrawals - lockedCapital + completedPrincipal + completedProfit;
+      // CORRECT Formula: deposits - withdrawals - locked + profit ONLY
+      // The principal is NOT added back because it was already in deposits!
+      // When investment completes, principal simply stops being "locked" (no longer subtracted)
+      const availableBalance = totalDeposits - totalWithdrawals - lockedCapital + completedProfit;
 
       setComponents({
         totalDeposits,
         totalWithdrawals,
         lockedCapital,
-        completedPrincipal,
         completedProfit,
         availableBalance: Math.max(0, availableBalance),
       });
@@ -124,13 +123,6 @@ export const BalanceBreakdown = () => {
       icon: Lock,
       color: "text-warning",
       prefix: "-",
-    },
-    {
-      label: "Returned Principal (Completed)",
-      value: components.completedPrincipal,
-      icon: CheckCircle2,
-      color: "text-primary",
-      prefix: "+",
     },
     {
       label: "Earned Profit (Completed)",
@@ -205,7 +197,7 @@ export const BalanceBreakdown = () => {
             </div>
 
             <p className="text-xs text-muted-foreground text-center pt-2 bg-muted/30 rounded p-2">
-              Formula: Deposits − Withdrawals − Locked Capital + (Returned Principal + Profit)
+              Formula: Deposits − Withdrawals − Locked Capital + Completed Profit
             </p>
           </CardContent>
         </CollapsibleContent>
