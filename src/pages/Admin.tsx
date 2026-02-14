@@ -247,6 +247,16 @@ const Admin = () => {
     min_withdrawal_amount: 0.001,
     withdrawals_enabled: true,
   });
+  const [depositsEnabled, setDepositsEnabled] = useState(true);
+
+  // Add Funds state
+  const [addFundsSearch, setAddFundsSearch] = useState("");
+  const [addFundsUser, setAddFundsUser] = useState<User | null>(null);
+  const [addFundsAmount, setAddFundsAmount] = useState("");
+  const [addFundsStatus, setAddFundsStatus] = useState<"pending" | "approved">("pending");
+  const [addFundsNote, setAddFundsNote] = useState("");
+  const [isAddingFunds, setIsAddingFunds] = useState(false);
+  const [addFundsSearching, setAddFundsSearching] = useState(false);
   const [apiHealth, setApiHealth] = useState<ApiHealthStatus>({
     coinmarketcap: { status: "unknown", lastSync: null },
     coingecko: { status: "unknown", lastSync: null },
@@ -525,6 +535,9 @@ const Admin = () => {
           }
           if (setting.setting_key === "landing_stats") {
             setLandingStats(setting.setting_value as unknown as LandingStats);
+          }
+          if (setting.setting_key === "deposits_enabled") {
+            setDepositsEnabled(setting.setting_value as unknown as boolean);
           }
         });
       }
@@ -1208,6 +1221,100 @@ const Admin = () => {
     }
   };
 
+  // Add Funds - Search user by email/phone/name
+  const handleSearchUser = async () => {
+    if (!addFundsSearch.trim()) return;
+    setAddFundsSearching(true);
+    setAddFundsUser(null);
+
+    const term = addFundsSearch.trim().toLowerCase();
+    const found = users.find(
+      (u) =>
+        u.email.toLowerCase() === term ||
+        u.phone?.toLowerCase() === term ||
+        u.full_name?.toLowerCase() === term
+    );
+
+    if (found) {
+      setAddFundsUser(found);
+    } else {
+      toast({ title: "User Not Found", description: "No user matches that email, phone, or name.", variant: "destructive" });
+    }
+    setAddFundsSearching(false);
+  };
+
+  const handleAddFunds = async () => {
+    if (!addFundsUser || !addFundsAmount) return;
+
+    const amount = parseFloat(addFundsAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast({ title: "Invalid Amount", description: "Enter a valid BTC amount.", variant: "destructive" });
+      return;
+    }
+
+    setIsAddingFunds(true);
+    try {
+      const { error } = await supabase.from("deposits").insert({
+        user_id: addFundsUser.user_id,
+        amount,
+        status: addFundsStatus,
+        txid: null,
+        payment_method: "Admin Manual",
+        admin_notes: addFundsNote || null,
+        reviewed_by: addFundsStatus === "approved" ? user?.id : null,
+        reviewed_at: addFundsStatus === "approved" ? new Date().toISOString() : null,
+      });
+
+      if (error) throw error;
+
+      await logAdminAction("add_funds", "deposit", addFundsUser.user_id, {
+        email: addFundsUser.email,
+        amount,
+        status: addFundsStatus,
+        note: addFundsNote,
+      });
+
+      toast({ title: "Funds Added", description: `${amount} BTC added to ${addFundsUser.email} as ${addFundsStatus}.` });
+      setAddFundsSearch("");
+      setAddFundsUser(null);
+      setAddFundsAmount("");
+      setAddFundsStatus("pending");
+      setAddFundsNote("");
+      fetchAllData();
+    } catch (error) {
+      console.error("Error adding funds:", error);
+      toast({ title: "Error", description: "Failed to add funds.", variant: "destructive" });
+    } finally {
+      setIsAddingFunds(false);
+    }
+  };
+
+  const handleToggleDeposits = async (enabled: boolean) => {
+    setDepositsEnabled(enabled);
+    // Immediately save to site_settings
+    const { data: existing } = await supabase
+      .from("site_settings")
+      .select("id")
+      .eq("setting_key", "deposits_enabled")
+      .single();
+
+    if (existing) {
+      await supabase
+        .from("site_settings")
+        .update({ setting_value: JSON.parse(JSON.stringify(enabled)), updated_at: new Date().toISOString(), updated_by: user?.id })
+        .eq("setting_key", "deposits_enabled");
+    } else {
+      await supabase.from("site_settings").insert({
+        setting_key: "deposits_enabled",
+        setting_value: JSON.parse(JSON.stringify(enabled)),
+        updated_by: user?.id,
+      });
+    }
+
+    await logAdminAction(enabled ? "enable_deposits" : "disable_deposits", "settings");
+    toast({ title: enabled ? "Deposits Enabled" : "Deposits Disabled", description: `Deposit page is now ${enabled ? "visible" : "hidden"} for all users.` });
+  };
+
   // Settings Save
   const handleSaveSettings = async () => {
     setIsSavingSettings(true);
@@ -1217,6 +1324,7 @@ const Admin = () => {
         { key: "demo_feed_settings", value: demoFeedSettings },
         { key: "landing_stats", value: landingStats },
         { key: "withdrawals_enabled", value: withdrawalSettings.withdrawals_enabled },
+        { key: "deposits_enabled", value: depositsEnabled },
       ];
 
       for (const { key, value } of settingsToSave) {
@@ -1448,6 +1556,7 @@ const Admin = () => {
             <TabsTrigger value="notifications" className="text-xs md:text-sm">Notifications</TabsTrigger>
             <TabsTrigger value="activity" className="text-xs md:text-sm">Activity Feed</TabsTrigger>
             <TabsTrigger value="logs" className="text-xs md:text-sm">Admin Logs</TabsTrigger>
+            <TabsTrigger value="add-funds" className="text-xs md:text-sm">Add Funds</TabsTrigger>
             <TabsTrigger value="settings" className="text-xs md:text-sm">Settings</TabsTrigger>
           </TabsList>
 
@@ -2119,9 +2228,127 @@ const Admin = () => {
             </Card>
           </TabsContent>
 
+          {/* Add Funds Tab */}
+          <TabsContent value="add-funds">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+                  <DollarSign className="w-5 h-5 text-success" />
+                  Add Funds to User Account
+                </CardTitle>
+                <CardDescription>Search for a user by email, phone, or name and add funds to their account</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label>Email / Phone / Name</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="e.g. iyanu1184@gmail.com"
+                      value={addFundsSearch}
+                      onChange={(e) => setAddFundsSearch(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleSearchUser()}
+                    />
+                    <Button onClick={handleSearchUser} disabled={addFundsSearching || !addFundsSearch.trim()}>
+                      <Search className="w-4 h-4 mr-2" />
+                      {addFundsSearching ? "Searching..." : "Find"}
+                    </Button>
+                  </div>
+                </div>
+
+                {addFundsUser && (
+                  <div className="space-y-4 p-4 bg-success/5 border border-success/20 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                        <span className="text-sm font-medium text-primary">
+                          {(addFundsUser.full_name?.[0] || addFundsUser.email[0]).toUpperCase()}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="font-medium">{addFundsUser.full_name || "No Name"}</p>
+                        <p className="text-sm text-muted-foreground">{addFundsUser.email}</p>
+                        {addFundsUser.phone && <p className="text-xs text-muted-foreground">{addFundsUser.phone}</p>}
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Amount (BTC)</Label>
+                        <Input
+                          type="number"
+                          step="0.00000001"
+                          placeholder="0.001"
+                          value={addFundsAmount}
+                          onChange={(e) => setAddFundsAmount(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Status</Label>
+                        <Select value={addFundsStatus} onValueChange={(v: "pending" | "approved") => setAddFundsStatus(v)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pending">Pending</SelectItem>
+                            <SelectItem value="approved">Approved</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Admin Note (Optional)</Label>
+                      <Textarea
+                        placeholder="Optional note for this deposit..."
+                        value={addFundsNote}
+                        onChange={(e) => setAddFundsNote(e.target.value)}
+                        rows={2}
+                      />
+                    </div>
+
+                    {addFundsStatus === "pending" && (
+                      <div className="p-3 bg-warning/10 border border-warning/20 rounded-lg">
+                        <p className="text-sm text-warning">⚠️ Pending deposits will appear in the user's history but won't be added to their balance until approved.</p>
+                      </div>
+                    )}
+
+                    <Button
+                      onClick={handleAddFunds}
+                      disabled={isAddingFunds || !addFundsAmount}
+                      className="w-full bg-success hover:bg-success/90"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      {isAddingFunds ? "Adding..." : `Add ${addFundsAmount || "0"} BTC (${addFundsStatus})`}
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           {/* Settings Tab */}
           <TabsContent value="settings">
             <div className="space-y-6">
+              {/* Deposit Toggle */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+                    <ArrowDownCircle className="w-5 h-5 text-success" />
+                    Deposit Page
+                  </CardTitle>
+                  <CardDescription>Control whether the deposit page is accessible to users</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+                    <div>
+                      <Label className="text-base font-medium">Enable Deposits</Label>
+                      <p className="text-sm text-muted-foreground">When disabled, the deposit page and all deposit links are completely hidden</p>
+                    </div>
+                    <Switch
+                      checked={depositsEnabled}
+                      onCheckedChange={handleToggleDeposits}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* API Health Status */}
               <Card>
                 <CardHeader>

@@ -2,6 +2,7 @@ import { ReactNode, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
+import { useDepositEnabled } from "@/hooks/useDepositEnabled";
 import Logo from "@/components/Logo";
 import BTCPriceBanner from "@/components/BTCPriceBanner";
 import MobileBalanceWidget from "@/components/MobileBalanceWidget";
@@ -45,6 +46,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const navigate = useNavigate();
   const { user, profile, isAdmin, signOut } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { depositsEnabled } = useDepositEnabled();
 
   // Enable real-time notifications for the logged-in user
   useRealtimeNotifications();
@@ -56,7 +58,8 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     navigate("/");
   };
 
-  const allNavItems = isAdmin ? [...navItems, ...adminItems] : navItems;
+  const filteredNavItems = depositsEnabled ? navItems : navItems.filter(item => item.href !== "/deposit");
+  const allNavItems = isAdmin ? [...filteredNavItems, ...adminItems] : filteredNavItems;
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -223,16 +226,18 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           <LayoutDashboard className="w-5 h-5" />
           <span className="text-[10px] font-medium">Home</span>
         </Link>
-        <Link
-          to="/deposit"
-          className={cn(
-            "flex flex-col items-center justify-center gap-1 p-2 rounded-lg min-w-[60px]",
-            location.pathname === "/deposit" ? "text-primary" : "text-muted-foreground"
-          )}
-        >
-          <ArrowDownCircle className="w-5 h-5" />
-          <span className="text-[10px] font-medium">Deposit</span>
-        </Link>
+        {depositsEnabled && (
+          <Link
+            to="/deposit"
+            className={cn(
+              "flex flex-col items-center justify-center gap-1 p-2 rounded-lg min-w-[60px]",
+              location.pathname === "/deposit" ? "text-primary" : "text-muted-foreground"
+            )}
+          >
+            <ArrowDownCircle className="w-5 h-5" />
+            <span className="text-[10px] font-medium">Deposit</span>
+          </Link>
+        )}
         <Link
           to="/investments"
           className={cn(

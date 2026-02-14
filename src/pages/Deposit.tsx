@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useBTCPrice } from "@/hooks/useBTCPrice";
+import { useDepositEnabled } from "@/hooks/useDepositEnabled";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -58,6 +59,7 @@ const Deposit = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { formatBTC, btcPrice, btcToUSD, usdToBTC, formatFiatAmount, getCurrencySymbol } = useBTCPrice();
+  const { depositsEnabled, isLoading: depositSettingLoading } = useDepositEnabled();
   const currency = profile?.preferred_currency || "USD";
   
   const [depositAddress, setDepositAddress] = useState<DepositAddress | null>(null);
@@ -74,6 +76,13 @@ const Deposit = () => {
       navigate("/auth");
     }
   }, [user, isLoading, navigate]);
+
+  // Redirect if deposits are disabled
+  useEffect(() => {
+    if (!depositSettingLoading && !depositsEnabled) {
+      navigate("/dashboard");
+    }
+  }, [depositsEnabled, depositSettingLoading, navigate]);
 
   useEffect(() => {
     if (user) {
