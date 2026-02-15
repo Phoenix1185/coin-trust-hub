@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useBTCPrice } from "@/hooks/useBTCPrice";
 import { useBalance } from "@/hooks/useBalance";
+import { useDepositEnabled } from "@/hooks/useDepositEnabled";
 import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
 import DashboardLayout from "@/components/DashboardLayout";
 import CryptoChart from "@/components/CryptoChart";
@@ -43,6 +44,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { formatBTC, formatWithBTC, btcToUSD, formatFiatAmount } = useBTCPrice();
   const { mainBalance, investmentBalance } = useBalance();
+  const { depositsEnabled } = useDepositEnabled();
   const currency = profile?.preferred_currency || "USD";
   
   const displayName = profile?.full_name || user?.email?.split("@")[0] || "User";
@@ -260,13 +262,15 @@ const Dashboard = () => {
 
         {/* Quick Actions - Mobile only */}
         <div className="grid grid-cols-3 gap-2 sm:hidden">
-          <Button
-            className="flex-col h-auto py-3 bg-success hover:bg-success/90 text-success-foreground"
-            onClick={() => navigate("/deposit")}
-          >
-            <ArrowDownCircle className="w-5 h-5 mb-1" />
-            <span className="text-xs">Deposit</span>
-          </Button>
+          {depositsEnabled && (
+            <Button
+              className="flex-col h-auto py-3 bg-success hover:bg-success/90 text-success-foreground"
+              onClick={() => navigate("/deposit")}
+            >
+              <ArrowDownCircle className="w-5 h-5 mb-1" />
+              <span className="text-xs">Deposit</span>
+            </Button>
+          )}
           <Button
             className="flex-col h-auto py-3"
             variant="outline"
@@ -293,13 +297,15 @@ const Dashboard = () => {
             <CardTitle className="text-base">Quick Actions</CardTitle>
           </CardHeader>
           <CardContent className="flex gap-2">
-            <Button
-              className="flex-1 bg-success hover:bg-success/90 text-success-foreground"
-              onClick={() => navigate("/deposit")}
-            >
-              <ArrowDownCircle className="w-4 h-4 mr-2" />
-              Deposit
-            </Button>
+            {depositsEnabled && (
+              <Button
+                className="flex-1 bg-success hover:bg-success/90 text-success-foreground"
+                onClick={() => navigate("/deposit")}
+              >
+                <ArrowDownCircle className="w-4 h-4 mr-2" />
+                Deposit
+              </Button>
+            )}
             <Button
               className="flex-1"
               variant="outline"

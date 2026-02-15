@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useBTCPrice } from "@/hooks/useBTCPrice";
 import { useBalance } from "@/hooks/useBalance";
+import { useDepositEnabled } from "@/hooks/useDepositEnabled";
 import DashboardLayout from "@/components/DashboardLayout";
 import ActiveInvestmentSummary from "@/components/ActiveInvestmentSummary";
 import BalanceBreakdown from "@/components/BalanceBreakdown";
@@ -26,6 +27,7 @@ const Wallet = () => {
   const navigate = useNavigate();
   const { btcPrice, formatBTC, btcToUSD, formatFiatAmount, isLoading: priceLoading } = useBTCPrice();
   const { mainBalance, investmentBalance, lockedCapital, lockedProfit } = useBalance();
+  const { depositsEnabled } = useDepositEnabled();
   const currency = profile?.preferred_currency || "USD";
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -236,14 +238,16 @@ const Wallet = () => {
               <CardTitle className="text-sm">Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="flex gap-2">
-              <Button 
-                onClick={() => navigate("/deposit")} 
-                className="flex-1 bg-success hover:bg-success/90"
-                size="sm"
-              >
-                <ArrowDownCircle className="w-4 h-4 mr-1" />
-                Deposit
-              </Button>
+              {depositsEnabled && (
+                <Button 
+                  onClick={() => navigate("/deposit")} 
+                  className="flex-1 bg-success hover:bg-success/90"
+                  size="sm"
+                >
+                  <ArrowDownCircle className="w-4 h-4 mr-1" />
+                  Deposit
+                </Button>
+              )}
               <Button 
                 onClick={() => navigate("/withdraw")} 
                 variant="outline"
