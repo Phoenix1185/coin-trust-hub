@@ -71,6 +71,7 @@ interface User {
   is_frozen: boolean | null;
   created_at: string;
   phone: string | null;
+  phone_number: string | null;
   wallet_address: string | null;
 }
 
@@ -253,6 +254,7 @@ const Admin = () => {
   const [addFundsSearch, setAddFundsSearch] = useState("");
   const [addFundsUser, setAddFundsUser] = useState<User | null>(null);
   const [addFundsAmount, setAddFundsAmount] = useState("");
+  const [addFundsCurrency, setAddFundsCurrency] = useState<"BTC" | "USD" | "EUR">("USD");
   const [addFundsStatus, setAddFundsStatus] = useState<"pending" | "approved">("pending");
   const [addFundsNote, setAddFundsNote] = useState("");
   const [isAddingFunds, setIsAddingFunds] = useState(false);
@@ -1221,7 +1223,7 @@ const Admin = () => {
     }
   };
 
-  // Add Funds - Search user by email/phone/name
+  // Add Funds - Search user by email/phone/username
   const handleSearchUser = async () => {
     if (!addFundsSearch.trim()) return;
     setAddFundsSearching(true);
@@ -1232,35 +1234,78 @@ const Admin = () => {
       (u) =>
         u.email.toLowerCase() === term ||
         u.phone?.toLowerCase() === term ||
-        u.full_name?.toLowerCase() === term
+        (u as any).phone_number?.toLowerCase() === term ||
+        u.full_name?.toLowerCase() === term ||
+        u.email.split("@")[0].toLowerCase() === term
     );
 
     if (found) {
       setAddFundsUser(found);
     } else {
-      toast({ title: "User Not Found", description: "No user matches that email, phone, or name.", variant: "destructive" });
+      // Try partial match
+      const partial = users.find(
+        (u) =>
+          u.email.toLowerCase().includes(term) ||
+          u.phone?.toLowerCase().includes(term) ||
+          (u as any).phone_number?.toLowerCase().includes(term) ||
+          u.full_name?.toLowerCase().includes(term)
+      );
+      if (partial) {
+        setAddFundsUser(partial);
+      } else {
+        toast({ title: "User Not Found", description: "No user matches that email, phone, or username.", variant: "destructive" });
+      }
     }
     setAddFundsSearching(false);
+  };
+
+  // Convert add funds amount to BTC based on selected currency
+  const getAddFundsBtcAmount = (): number => {
+    const amount = parseFloat(addFundsAmount);
+    if (isNaN(amount) || amount <= 0) return 0;
+    if (addFundsCurrency === "BTC") return amount;
+    // Use a simple fetch of current BTC price from the crypto-data edge function
+    // For now we use the exchange rates: USD=1, EUR=0.92
+    const usdAmount = addFundsCurrency === "EUR" ? amount / 0.92 : amount;
+    // We need BTC price - fetch it inline or use a rough estimate
+    return usdAmount; // Will be converted below using actual price
   };
 
   const handleAddFunds = async () => {
     if (!addFundsUser || !addFundsAmount) return;
 
-    const amount = parseFloat(addFundsAmount);
-    if (isNaN(amount) || amount <= 0) {
-      toast({ title: "Invalid Amount", description: "Enter a valid BTC amount.", variant: "destructive" });
+    const inputAmount = parseFloat(addFundsAmount);
+    if (isNaN(inputAmount) || inputAmount <= 0) {
+      toast({ title: "Invalid Amount", description: "Enter a valid amount.", variant: "destructive" });
       return;
     }
 
     setIsAddingFunds(true);
     try {
+      let btcAmount = inputAmount;
+      
+      if (addFundsCurrency !== "BTC") {
+        // Fetch current BTC price for conversion
+        const { data: cryptoData } = await supabase.functions.invoke("crypto-data", { body: {} });
+        const btcPrice = cryptoData?.find((c: any) => c.symbol === "BTC")?.price || 100000;
+        
+        let usdAmount = inputAmount;
+        if (addFundsCurrency === "EUR") {
+          // Fetch exchange rates
+          const { data: ratesData } = await supabase.functions.invoke("exchange-rates", { body: {} });
+          const eurRate = ratesData?.rates?.EUR || 0.92;
+          usdAmount = inputAmount / eurRate;
+        }
+        btcAmount = usdAmount / btcPrice;
+      }
+
       const { error } = await supabase.from("deposits").insert({
         user_id: addFundsUser.user_id,
-        amount,
+        amount: btcAmount,
         status: addFundsStatus,
         txid: null,
         payment_method: "Admin Manual",
-        admin_notes: addFundsNote || null,
+        admin_notes: addFundsNote || `Added ${inputAmount} ${addFundsCurrency}`,
         reviewed_by: addFundsStatus === "approved" ? user?.id : null,
         reviewed_at: addFundsStatus === "approved" ? new Date().toISOString() : null,
       });
@@ -1269,15 +1314,18 @@ const Admin = () => {
 
       await logAdminAction("add_funds", "deposit", addFundsUser.user_id, {
         email: addFundsUser.email,
-        amount,
+        amount: btcAmount,
+        inputAmount,
+        currency: addFundsCurrency,
         status: addFundsStatus,
         note: addFundsNote,
       });
 
-      toast({ title: "Funds Added", description: `${amount} BTC added to ${addFundsUser.email} as ${addFundsStatus}.` });
+      toast({ title: "Funds Added", description: `${btcAmount.toFixed(8)} BTC (${inputAmount} ${addFundsCurrency}) added to ${addFundsUser.email} as ${addFundsStatus}.` });
       setAddFundsSearch("");
       setAddFundsUser(null);
       setAddFundsAmount("");
+      setAddFundsCurrency("USD");
       setAddFundsStatus("pending");
       setAddFundsNote("");
       fetchAllData();
@@ -2240,10 +2288,10 @@ const Admin = () => {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-2">
-                  <Label>Email / Phone / Name</Label>
+                  <Label>Email / Phone / Username</Label>
                   <div className="flex gap-2">
                     <Input
-                      placeholder="e.g. iyanu1184@gmail.com"
+                      placeholder="e.g. iyanu1184@gmail.com or username or phone"
                       value={addFundsSearch}
                       onChange={(e) => setAddFundsSearch(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && handleSearchUser()}
@@ -2266,17 +2314,28 @@ const Admin = () => {
                       <div>
                         <p className="font-medium">{addFundsUser.full_name || "No Name"}</p>
                         <p className="text-sm text-muted-foreground">{addFundsUser.email}</p>
-                        {addFundsUser.phone && <p className="text-xs text-muted-foreground">{addFundsUser.phone}</p>}
+                        {addFundsUser.phone && <p className="text-xs text-muted-foreground">📞 {addFundsUser.phone}</p>}
                       </div>
                     </div>
 
-                    <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-4 md:grid-cols-3">
                       <div className="space-y-2">
-                        <Label>Amount (BTC)</Label>
+                        <Label>Currency</Label>
+                        <Select value={addFundsCurrency} onValueChange={(v: "BTC" | "USD" | "EUR") => setAddFundsCurrency(v)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="USD">USD ($)</SelectItem>
+                            <SelectItem value="EUR">EUR (€)</SelectItem>
+                            <SelectItem value="BTC">BTC (₿)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Amount ({addFundsCurrency})</Label>
                         <Input
                           type="number"
-                          step="0.00000001"
-                          placeholder="0.001"
+                          step={addFundsCurrency === "BTC" ? "0.00000001" : "0.01"}
+                          placeholder={addFundsCurrency === "BTC" ? "0.001" : "50.00"}
                           value={addFundsAmount}
                           onChange={(e) => setAddFundsAmount(e.target.value)}
                         />
@@ -2292,6 +2351,12 @@ const Admin = () => {
                         </Select>
                       </div>
                     </div>
+
+                    {addFundsCurrency !== "BTC" && addFundsAmount && parseFloat(addFundsAmount) > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Will be converted to BTC at the current market rate upon submission.
+                      </p>
+                    )}
 
                     <div className="space-y-2">
                       <Label>Admin Note (Optional)</Label>
@@ -2315,7 +2380,7 @@ const Admin = () => {
                       className="w-full bg-success hover:bg-success/90"
                     >
                       <Plus className="w-4 h-4 mr-2" />
-                      {isAddingFunds ? "Adding..." : `Add ${addFundsAmount || "0"} BTC (${addFundsStatus})`}
+                      {isAddingFunds ? "Adding..." : `Add ${addFundsAmount || "0"} ${addFundsCurrency} (${addFundsStatus})`}
                     </Button>
                   </div>
                 )}

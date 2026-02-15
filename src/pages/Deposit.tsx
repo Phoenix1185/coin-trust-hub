@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Copy, CheckCircle, Clock, XCircle, QrCode, Wallet, CreditCard, Landmark, Bitcoin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface DepositAddress {
   id: string;
@@ -70,6 +71,7 @@ const Deposit = () => {
   const [txid, setTxid] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [selectedNetwork, setSelectedNetwork] = useState("");
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -330,49 +332,85 @@ const Deposit = () => {
                 </div>
               )}
 
-              {/* Show wallet address for USDT/USDC */}
-              {(selectedPaymentMethod?.icon === "usdt" || selectedPaymentMethod?.icon === "usdc") && selectedPaymentMethod.wallet_address && (
+              {/* Show wallet address for USDT/USDC with network selector */}
+              {(selectedPaymentMethod?.icon === "usdt" || selectedPaymentMethod?.icon === "usdc") && (
                 <div className="mt-4 space-y-4">
-                  <div className="flex justify-center p-4 bg-white rounded-lg">
-                    <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${selectedPaymentMethod.wallet_address}`}
-                      alt="QR Code"
-                      className="w-40 h-40"
-                    />
-                  </div>
                   <div className="space-y-2">
-                    <Label>{selectedPaymentMethod.name} Address</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        value={selectedPaymentMethod.wallet_address}
-                        readOnly
-                        className="font-mono text-sm"
-                      />
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => handleCopyAddress(selectedPaymentMethod.wallet_address!)}
-                      >
-                        {copied ? (
-                          <CheckCircle className="w-4 h-4 text-success" />
+                    <Label>Select Network</Label>
+                    <Select value={selectedNetwork} onValueChange={setSelectedNetwork}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a network" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {selectedPaymentMethod?.icon === "usdt" ? (
+                          <>
+                            <SelectItem value="ERC20">Ethereum (ERC20)</SelectItem>
+                            <SelectItem value="TRC20">Tron (TRC20)</SelectItem>
+                            <SelectItem value="BEP20">BSC (BEP20)</SelectItem>
+                            <SelectItem value="POLYGON">Polygon</SelectItem>
+                            <SelectItem value="ARBITRUM">Arbitrum</SelectItem>
+                            <SelectItem value="OPTIMISM">Optimism</SelectItem>
+                            <SelectItem value="SOLANA">Solana</SelectItem>
+                          </>
                         ) : (
-                          <Copy className="w-4 h-4" />
+                          <>
+                            <SelectItem value="ERC20">Ethereum (ERC20)</SelectItem>
+                            <SelectItem value="BEP20">BSC (BEP20)</SelectItem>
+                            <SelectItem value="POLYGON">Polygon</SelectItem>
+                            <SelectItem value="ARBITRUM">Arbitrum</SelectItem>
+                            <SelectItem value="OPTIMISM">Optimism</SelectItem>
+                            <SelectItem value="SOLANA">Solana</SelectItem>
+                            <SelectItem value="BASE">Base</SelectItem>
+                          </>
                         )}
-                      </Button>
-                    </div>
+                      </SelectContent>
+                    </Select>
                   </div>
+
+                  {selectedPaymentMethod.wallet_address && (
+                    <>
+                      <div className="flex justify-center p-4 bg-white rounded-lg">
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${selectedPaymentMethod.wallet_address}`}
+                          alt="QR Code"
+                          className="w-40 h-40"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{selectedPaymentMethod.name} Address {selectedNetwork && `(${selectedNetwork})`}</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            value={selectedPaymentMethod.wallet_address}
+                            readOnly
+                            className="font-mono text-sm"
+                          />
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => handleCopyAddress(selectedPaymentMethod.wallet_address!)}
+                          >
+                            {copied ? (
+                              <CheckCircle className="w-4 h-4 text-success" />
+                            ) : (
+                              <Copy className="w-4 h-4" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {!selectedPaymentMethod.wallet_address && (
+                    <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                      <p className="text-sm text-destructive">No deposit address configured for this payment method. Please contact support.</p>
+                    </div>
+                  )}
+
                   {selectedPaymentMethod.instructions && (
                     <div className="p-3 bg-warning/10 border border-warning/20 rounded-lg">
                       <p className="text-sm text-warning">{selectedPaymentMethod.instructions}</p>
                     </div>
                   )}
-                </div>
-              )}
-
-              {/* Show no address message for crypto without address */}
-              {(selectedPaymentMethod?.icon === "usdt" || selectedPaymentMethod?.icon === "usdc") && !selectedPaymentMethod.wallet_address && (
-                <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-                  <p className="text-sm text-destructive">No deposit address configured for this payment method. Please contact support.</p>
                 </div>
               )}
 
