@@ -314,6 +314,9 @@ const Index = () => {
                 <Link to="/faq" className="text-muted-foreground hover:text-primary transition-colors">
                   FAQ
                 </Link>
+                <Link to="/deposit-guide" className="text-muted-foreground hover:text-primary transition-colors">
+                  How to Deposit
+                </Link>
                 <Link to="/terms-of-service" className="text-muted-foreground hover:text-primary transition-colors">
                   Terms of Service
                 </Link>

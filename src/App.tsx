@@ -23,6 +23,7 @@ import FAQ from "./pages/FAQ";
 import EmailVerified from "./pages/EmailVerified";
 import ResetPassword from "./pages/ResetPassword";
 import LinkExpired from "./pages/LinkExpired";
+import DepositGuide from "./pages/DepositGuide";
 import CookieConsent from "./components/CookieConsent";
 
 const queryClient = new QueryClient();
@@ -53,6 +54,7 @@ const App = () => (
             <Route path="/email-verified" element={<EmailVerified />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/link-expired" element={<LinkExpired />} />
+            <Route path="/deposit-guide" element={<DepositGuide />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           <CookieConsent />
