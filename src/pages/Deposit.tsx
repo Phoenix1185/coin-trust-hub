@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useBTCPrice } from "@/hooks/useBTCPrice";
 import { useDepositEnabled } from "@/hooks/useDepositEnabled";
@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Copy, CheckCircle, Clock, XCircle, QrCode, Wallet, CreditCard, Landmark, Bitcoin } from "lucide-react";
+import { Copy, CheckCircle, Clock, XCircle, QrCode, Wallet, CreditCard, Landmark, Bitcoin, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -247,6 +247,18 @@ const Deposit = () => {
         <div>
           <h1 className="text-2xl font-bold">Deposit</h1>
           <p className="text-muted-foreground">Add funds to your account</p>
+        </div>
+
+        {/* Guide Banner */}
+        <div className="flex items-center gap-3 p-4 bg-primary/5 border border-primary/20 rounded-lg">
+          <Info className="w-5 h-5 text-primary shrink-0" />
+          <p className="text-sm text-muted-foreground">
+            New to crypto?{" "}
+            <Link to="/deposit-guide" className="text-primary font-medium hover:underline">
+              Read our step-by-step deposit guide
+            </Link>{" "}
+            to learn how to buy and send cryptocurrency.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

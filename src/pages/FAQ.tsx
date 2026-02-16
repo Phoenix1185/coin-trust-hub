@@ -189,6 +189,9 @@ const FAQ = () => {
             <Link to="/risk-disclosure" className="hover:text-primary transition-colors">
               Risk Disclosure
             </Link>
+            <Link to="/deposit-guide" className="hover:text-primary transition-colors">
+              How to Deposit
+            </Link>
           </div>
         </div>
       </div>
