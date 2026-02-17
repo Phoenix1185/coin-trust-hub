@@ -249,6 +249,7 @@ export type Database = {
           instructions: string | null
           is_active: boolean | null
           name: string
+          network_addresses: Json | null
           type: string
           updated_at: string
           wallet_address: string | null
@@ -262,6 +263,7 @@ export type Database = {
           instructions?: string | null
           is_active?: boolean | null
           name: string
+          network_addresses?: Json | null
           type: string
           updated_at?: string
           wallet_address?: string | null
@@ -275,6 +277,7 @@ export type Database = {
           instructions?: string | null
           is_active?: boolean | null
           name?: string
+          network_addresses?: Json | null
           type?: string
           updated_at?: string
           wallet_address?: string | null
