@@ -172,7 +172,7 @@ serve(async (req) => {
           </ul>
           <p>If you need any help getting started, check out our <strong>Deposit Guide</strong> or contact our support team.</p>
           <div style="text-align:center;margin:25px 0;">
-            <a href="https://coin-trust-hub.lovable.app/dashboard" style="display:inline-block;background:#f7931a;color:#fff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;">Go to Dashboard</a>
+            <a href="https://bitcryptotradingco.qzz.io/dashboard" style="display:inline-block;background:#f7931a;color:#fff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;">Go to Dashboard</a>
           </div>
         `;
         break;
@@ -184,7 +184,7 @@ serve(async (req) => {
           <p>Great news! Your deposit of <strong>${data.amount} BTC</strong> has been approved and credited to your account.</p>
           ${data.payment_method ? `<p style="color:#999;">Payment Method: ${data.payment_method}</p>` : ""}
           <div style="text-align:center;margin:25px 0;">
-            <a href="https://coin-trust-hub.lovable.app/dashboard" style="display:inline-block;background:#f7931a;color:#fff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;">View Balance</a>
+            <a href="https://bitcryptotradingco.qzz.io/dashboard" style="display:inline-block;background:#f7931a;color:#fff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;">View Balance</a>
           </div>
         `;
         break;
@@ -197,7 +197,7 @@ serve(async (req) => {
           ${data.reason ? `<p style="color:#ff6b6b;"><strong>Reason:</strong> ${data.reason}</p>` : ""}
           <p>If you believe this is an error, please contact our support team for assistance.</p>
           <div style="text-align:center;margin:25px 0;">
-            <a href="https://coin-trust-hub.lovable.app/support" style="display:inline-block;background:#f7931a;color:#fff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;">Contact Support</a>
+            <a href="https://bitcryptotradingco.qzz.io/support" style="display:inline-block;background:#f7931a;color:#fff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;">Contact Support</a>
           </div>
         `;
         break;
@@ -210,7 +210,7 @@ serve(async (req) => {
           ${data.txid ? `<p style="color:#999;">Transaction ID: <code style="background:#1a1a2e;padding:2px 6px;border-radius:4px;">${data.txid}</code></p>` : ""}
           ${data.wallet_address ? `<p style="color:#999;">Wallet: <code style="background:#1a1a2e;padding:2px 6px;border-radius:4px;">${data.wallet_address}</code></p>` : ""}
           <div style="text-align:center;margin:25px 0;">
-            <a href="https://coin-trust-hub.lovable.app/wallet" style="display:inline-block;background:#f7931a;color:#fff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;">View Wallet</a>
+            <a href="https://bitcryptotradingco.qzz.io/wallet" style="display:inline-block;background:#f7931a;color:#fff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;">View Wallet</a>
           </div>
         `;
         break;
@@ -223,7 +223,7 @@ serve(async (req) => {
           ${data.reason ? `<p style="color:#ff6b6b;"><strong>Reason:</strong> ${data.reason}</p>` : ""}
           <p>Please contact support if you have questions.</p>
           <div style="text-align:center;margin:25px 0;">
-            <a href="https://coin-trust-hub.lovable.app/support" style="display:inline-block;background:#f7931a;color:#fff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;">Contact Support</a>
+            <a href="https://bitcryptotradingco.qzz.io/support" style="display:inline-block;background:#f7931a;color:#fff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;">Contact Support</a>
           </div>
         `;
         break;
@@ -235,7 +235,7 @@ serve(async (req) => {
           <p>Your investment of <strong>${data.amount} BTC</strong> in the <strong>${data.plan_name || "Investment"}</strong> plan has been activated!</p>
           <p>Your returns will begin accruing immediately.</p>
           <div style="text-align:center;margin:25px 0;">
-            <a href="https://coin-trust-hub.lovable.app/investments" style="display:inline-block;background:#f7931a;color:#fff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;">View Investments</a>
+            <a href="https://bitcryptotradingco.qzz.io/investments" style="display:inline-block;background:#f7931a;color:#fff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;">View Investments</a>
           </div>
         `;
         break;
@@ -247,7 +247,7 @@ serve(async (req) => {
           <p>Congratulations! Your investment in the <strong>${data.plan_name || "Investment"}</strong> plan has matured.</p>
           <p>Your returns have been credited to your account balance.</p>
           <div style="text-align:center;margin:25px 0;">
-            <a href="https://coin-trust-hub.lovable.app/wallet" style="display:inline-block;background:#f7931a;color:#fff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;">View Wallet</a>
+            <a href="https://bitcryptotradingco.qzz.io/wallet" style="display:inline-block;background:#f7931a;color:#fff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;">View Wallet</a>
           </div>
         `;
         break;
@@ -258,7 +258,7 @@ serve(async (req) => {
           <p>Hi ${userName},</p>
           <p>Your investment request has been declined. Please contact support for more information.</p>
           <div style="text-align:center;margin:25px 0;">
-            <a href="https://coin-trust-hub.lovable.app/support" style="display:inline-block;background:#f7931a;color:#fff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;">Contact Support</a>
+            <a href="https://bitcryptotradingco.qzz.io/support" style="display:inline-block;background:#f7931a;color:#fff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;">Contact Support</a>
           </div>
         `;
         break;
@@ -269,7 +269,7 @@ serve(async (req) => {
           <p>Hi ${userName},</p>
           <p>Your account has been temporarily frozen. Please contact support for assistance.</p>
           <div style="text-align:center;margin:25px 0;">
-            <a href="https://coin-trust-hub.lovable.app/support" style="display:inline-block;background:#f7931a;color:#fff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;">Contact Support</a>
+            <a href="https://bitcryptotradingco.qzz.io/support" style="display:inline-block;background:#f7931a;color:#fff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;">Contact Support</a>
           </div>
         `;
         break;
@@ -280,7 +280,7 @@ serve(async (req) => {
           <p>Hi ${userName},</p>
           <p>Your account has been unfrozen and is now fully accessible again.</p>
           <div style="text-align:center;margin:25px 0;">
-            <a href="https://coin-trust-hub.lovable.app/dashboard" style="display:inline-block;background:#f7931a;color:#fff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;">Go to Dashboard</a>
+            <a href="https://bitcryptotradingco.qzz.io/dashboard" style="display:inline-block;background:#f7931a;color:#fff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;">Go to Dashboard</a>
           </div>
         `;
         break;
