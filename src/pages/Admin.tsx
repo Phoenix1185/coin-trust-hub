@@ -81,6 +81,8 @@ interface Deposit {
   amount: number;
   status: string;
   txid: string | null;
+  payment_method: string | null;
+  admin_notes: string | null;
   created_at: string;
   profiles?: { email: string; full_name: string | null };
 }
@@ -92,6 +94,7 @@ interface Withdrawal {
   wallet_address: string;
   status: string;
   admin_txid: string | null;
+  payment_method: string | null;
   created_at: string;
   profiles?: { email: string; full_name: string | null };
 }
@@ -160,6 +163,7 @@ interface PaymentMethod {
   instructions: string | null;
   is_active: boolean | null;
   display_order: number | null;
+  network_addresses: unknown;
   created_at: string;
 }
 
@@ -228,6 +232,7 @@ const Admin = () => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [btcPrice, setBtcPrice] = useState<number>(100000);
 
   // Core data
   const [users, setUsers] = useState<User[]>([]);
@@ -368,6 +373,7 @@ const Admin = () => {
     instructions: "",
     display_order: 0,
     is_active: true,
+    network_addresses: {} as Record<string, string>,
   });
 
   // Auth check
@@ -399,8 +405,31 @@ const Admin = () => {
       fetchAdminLogs();
       fetchNotifications();
       checkApiHealth();
+      fetchBtcPrice();
     }
   }, [user, isAdmin]);
+
+  const fetchBtcPrice = async () => {
+    try {
+      const { data } = await supabase.functions.invoke("crypto-data", { body: {} });
+      if (data && Array.isArray(data)) {
+        const btc = data.find((c: any) => c.symbol === "BTC");
+        if (btc?.price && btc.price > 0) setBtcPrice(btc.price);
+      }
+    } catch (err) {
+      console.error("Error fetching BTC price for admin:", err);
+    }
+  };
+
+  const sendEmailNotification = async (type: string, userId: string, data: Record<string, unknown>) => {
+    try {
+      await supabase.functions.invoke("send-email", {
+        body: { type, user_id: userId, data },
+      });
+    } catch (err) {
+      console.error("Error sending email notification:", err);
+    }
+  };
 
   const logAdminAction = async (action: string, targetType?: string, targetId?: string, details?: Record<string, unknown>) => {
     try {
@@ -612,6 +641,12 @@ const Admin = () => {
         { email: userProfile.email }
       );
 
+      sendEmailNotification(
+        userProfile.is_frozen ? "account_unfrozen" : "account_frozen",
+        userProfile.user_id,
+        { email: userProfile.email }
+      );
+
       toast({
         title: userProfile.is_frozen ? "Account Unfrozen" : "Account Frozen",
         description: `${userProfile.email}'s account has been ${userProfile.is_frozen ? "unfrozen" : "frozen"}.`,
@@ -682,6 +717,12 @@ const Admin = () => {
 
       await logAdminAction("approve_deposit", "deposit", deposit.id, { amount: deposit.amount, user_id: deposit.user_id });
 
+      // Send email notification
+      sendEmailNotification("deposit_approved", deposit.user_id, {
+        amount: deposit.amount.toFixed(4),
+        payment_method: deposit.payment_method,
+      });
+
       toast({ title: "Deposit Approved", description: `${deposit.amount.toFixed(4)} BTC approved successfully.` });
       fetchAllData();
     } catch (error) {
@@ -705,6 +746,12 @@ const Admin = () => {
       if (error) throw error;
 
       await logAdminAction("decline_deposit", "deposit", deposit.id, { amount: deposit.amount, reason });
+
+      // Send email notification
+      sendEmailNotification("deposit_declined", deposit.user_id, {
+        amount: deposit.amount.toFixed(4),
+        reason: reason || "Declined by admin",
+      });
 
       toast({ title: "Deposit Declined", description: "Deposit has been declined." });
       fetchAllData();
@@ -736,6 +783,12 @@ const Admin = () => {
 
       await logAdminAction("approve_withdrawal", "withdrawal", withdrawal.id, { amount: withdrawal.amount, txid });
 
+      sendEmailNotification("withdrawal_approved", withdrawal.user_id, {
+        amount: withdrawal.amount.toFixed(4),
+        txid,
+        wallet_address: withdrawal.wallet_address,
+      });
+
       toast({ title: "Withdrawal Approved", description: `${withdrawal.amount.toFixed(4)} BTC sent successfully.` });
       fetchAllData();
     } catch (error) {
@@ -759,6 +812,11 @@ const Admin = () => {
       if (error) throw error;
 
       await logAdminAction("decline_withdrawal", "withdrawal", withdrawal.id, { amount: withdrawal.amount, reason });
+
+      sendEmailNotification("withdrawal_declined", withdrawal.user_id, {
+        amount: withdrawal.amount.toFixed(4),
+        reason: reason || "Request declined by admin.",
+      });
 
       toast({ title: "Withdrawal Declined", description: "Withdrawal has been declined." });
       fetchAllData();
@@ -811,6 +869,11 @@ const Admin = () => {
         duration_days: plan.duration_days,
       });
 
+      sendEmailNotification("investment_activated", investment.user_id, {
+        amount: investment.amount.toFixed(4),
+        plan_name: investment.investment_plans?.name,
+      });
+
       toast({ 
         title: "Investment Activated", 
         description: `Investment is now active. Daily profit of ${(totalProfit / plan.duration_days).toFixed(8)} BTC will settle every 24 hours.` 
@@ -832,6 +895,10 @@ const Admin = () => {
       if (error) throw error;
 
       await logAdminAction("decline_investment", "investment", investment.id, { amount: investment.amount });
+
+      sendEmailNotification("investment_declined", investment.user_id, {
+        amount: investment.amount.toFixed(4),
+      });
 
       toast({ title: "Investment Declined", description: "Investment has been declined." });
       fetchAllData();
@@ -1034,6 +1101,7 @@ const Admin = () => {
             instructions: paymentMethodForm.instructions || null,
             display_order: paymentMethodForm.display_order,
             is_active: paymentMethodForm.is_active,
+            network_addresses: Object.keys(paymentMethodForm.network_addresses).length > 0 ? paymentMethodForm.network_addresses : null,
           })
           .eq("id", editingPaymentMethod.id);
 
@@ -1050,6 +1118,7 @@ const Admin = () => {
           instructions: paymentMethodForm.instructions || null,
           display_order: paymentMethodForm.display_order,
           is_active: paymentMethodForm.is_active,
+          network_addresses: Object.keys(paymentMethodForm.network_addresses).length > 0 ? paymentMethodForm.network_addresses : null,
         });
 
         if (error) throw error;
@@ -1059,7 +1128,7 @@ const Admin = () => {
 
       setPaymentMethodDialogOpen(false);
       setEditingPaymentMethod(null);
-      setPaymentMethodForm({ name: "", type: "both", icon: "bitcoin", description: "", wallet_address: "", instructions: "", display_order: 0, is_active: true });
+      setPaymentMethodForm({ name: "", type: "both", icon: "bitcoin", description: "", wallet_address: "", instructions: "", display_order: 0, is_active: true, network_addresses: {} });
       fetchPaymentMethods();
     } catch (error) {
       console.error("Error saving payment method:", error);
@@ -1424,7 +1493,10 @@ const Admin = () => {
   };
 
   // Utility Functions
-  const formatCurrency = (amount: number) => `${amount.toFixed(4)} BTC`;
+  const formatCurrency = (amount: number) => {
+    const usdValue = amount * btcPrice;
+    return `$${usdValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${amount.toFixed(4)} BTC)`;
+  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -1860,7 +1932,7 @@ const Admin = () => {
                   </CardTitle>
                   <CardDescription>Manage deposit and withdrawal methods</CardDescription>
                 </div>
-                <Button onClick={() => { setEditingPaymentMethod(null); setPaymentMethodForm({ name: "", type: "both", icon: "bitcoin", description: "", wallet_address: "", instructions: "", display_order: 0, is_active: true }); setPaymentMethodDialogOpen(true); }}>
+                <Button onClick={() => { setEditingPaymentMethod(null); setPaymentMethodForm({ name: "", type: "both", icon: "bitcoin", description: "", wallet_address: "", instructions: "", display_order: 0, is_active: true, network_addresses: {} }); setPaymentMethodDialogOpen(true); }}>
                   <Plus className="w-4 h-4 mr-2" />Add Method
                 </Button>
               </CardHeader>
@@ -1895,8 +1967,9 @@ const Admin = () => {
                               wallet_address: method.wallet_address || "", 
                               instructions: method.instructions || "", 
                               display_order: method.display_order || 0, 
-                              is_active: method.is_active ?? true 
-                            }); 
+                              is_active: method.is_active ?? true,
+                              network_addresses: (typeof method.network_addresses === 'object' && method.network_addresses !== null ? method.network_addresses : {}) as Record<string, string>,
+                            });
                             setPaymentMethodDialogOpen(true); 
                           }}>
                             <Edit className="w-4 h-4" />
@@ -2827,6 +2900,34 @@ const Admin = () => {
                 className="font-mono"
               />
             </div>
+
+            {/* Network-specific addresses for USDT/USDC */}
+            {(paymentMethodForm.icon === "usdt" || paymentMethodForm.icon === "usdc") && (
+              <div className="space-y-3 p-4 bg-primary/5 border border-primary/20 rounded-lg">
+                <Label className="text-base font-medium">Network-Specific Addresses</Label>
+                <p className="text-xs text-muted-foreground">Set a wallet address for each supported network</p>
+                {(paymentMethodForm.icon === "usdt" 
+                  ? ["ERC20", "TRC20", "BEP20", "POLYGON", "ARBITRUM", "OPTIMISM", "SOLANA"]
+                  : ["ERC20", "BEP20", "POLYGON", "ARBITRUM", "OPTIMISM", "SOLANA", "BASE"]
+                ).map((network) => (
+                  <div key={network} className="space-y-1">
+                    <Label className="text-xs">{network}</Label>
+                    <Input
+                      value={paymentMethodForm.network_addresses[network] || ""}
+                      onChange={(e) => setPaymentMethodForm({
+                        ...paymentMethodForm,
+                        network_addresses: {
+                          ...paymentMethodForm.network_addresses,
+                          [network]: e.target.value,
+                        },
+                      })}
+                      placeholder={`${paymentMethodForm.icon.toUpperCase()} ${network} address`}
+                      className="font-mono text-xs"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Description</Label>
               <Input 
@@ -2903,6 +3004,11 @@ const DepositItem = ({
           <p className="text-sm text-muted-foreground">
             Amount: <span className="text-success font-semibold">{formatCurrency(deposit.amount)}</span>
           </p>
+          {deposit.payment_method && (
+            <p className="text-xs text-muted-foreground">
+              Method: <Badge variant="outline" className="text-xs ml-1">{deposit.payment_method}</Badge>
+            </p>
+          )}
           <p className="text-xs text-muted-foreground">{formatDate(deposit.created_at)}</p>
           {deposit.txid && <p className="text-xs text-muted-foreground break-all">TXID: {deposit.txid}</p>}
         </div>
@@ -2965,6 +3071,11 @@ const WithdrawalItem = ({
           <p className="text-sm text-muted-foreground">
             Amount: <span className="text-primary font-semibold">{formatCurrency(withdrawal.amount)}</span>
           </p>
+          {withdrawal.payment_method && (
+            <p className="text-xs text-muted-foreground">
+              Method: <Badge variant="outline" className="text-xs ml-1">{withdrawal.payment_method}</Badge>
+            </p>
+          )}
           <p className="text-xs text-muted-foreground break-all">Wallet: {withdrawal.wallet_address}</p>
           <p className="text-xs text-muted-foreground">{formatDate(withdrawal.created_at)}</p>
         </div>

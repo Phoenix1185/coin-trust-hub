@@ -275,6 +275,15 @@ const Auth = () => {
         variant: "destructive",
       });
     } else {
+      // Send welcome email
+      try {
+        await supabase.functions.invoke("send-email", {
+          body: { type: "signup", user_id: null, data: { email: signupEmail, user_name: signupFirstName } },
+        });
+      } catch (emailErr) {
+        console.error("Failed to send welcome email:", emailErr);
+      }
+
       toast({
         title: "Account Created!",
         description: "Please check your email to verify your account.",
