@@ -60,6 +60,7 @@ import {
   Eye,
   Copy,
   Power,
+  MinusCircle,
 } from "lucide-react";
 
 // Interfaces
@@ -264,6 +265,16 @@ const Admin = () => {
   const [addFundsNote, setAddFundsNote] = useState("");
   const [isAddingFunds, setIsAddingFunds] = useState(false);
   const [addFundsSearching, setAddFundsSearching] = useState(false);
+
+  // Remove Funds state
+  const [removeFundsSearch, setRemoveFundsSearch] = useState("");
+  const [removeFundsUser, setRemoveFundsUser] = useState<User | null>(null);
+  const [removeFundsAmount, setRemoveFundsAmount] = useState("");
+  const [removeFundsCurrency, setRemoveFundsCurrency] = useState<"BTC" | "USD">("USD");
+  const [removeFundsReason, setRemoveFundsReason] = useState("");
+  const [isRemovingFunds, setIsRemovingFunds] = useState(false);
+  const [removeFundsSearching, setRemoveFundsSearching] = useState(false);
+  const [userDeposits, setUserDeposits] = useState<Deposit[]>([]);
   const [apiHealth, setApiHealth] = useState<ApiHealthStatus>({
     coinmarketcap: { status: "unknown", lastSync: null },
     coingecko: { status: "unknown", lastSync: null },
@@ -1406,6 +1417,156 @@ const Admin = () => {
     }
   };
 
+  // Remove Funds - Search user
+  const handleSearchUserForRemoval = async () => {
+    if (!removeFundsSearch.trim()) return;
+    setRemoveFundsSearching(true);
+    setRemoveFundsUser(null);
+    setUserDeposits([]);
+
+    const term = removeFundsSearch.trim().toLowerCase();
+    const found = users.find(
+      (u) =>
+        u.email.toLowerCase() === term ||
+        u.phone?.toLowerCase() === term ||
+        (u as any).phone_number?.toLowerCase() === term ||
+        u.full_name?.toLowerCase() === term ||
+        u.email.split("@")[0].toLowerCase() === term ||
+        u.email.toLowerCase().includes(term) ||
+        u.full_name?.toLowerCase().includes(term)
+    );
+
+    if (found) {
+      setRemoveFundsUser(found);
+      // Fetch user's approved deposits
+      const { data: depData } = await supabase
+        .from("deposits")
+        .select("*")
+        .eq("user_id", found.user_id)
+        .eq("status", "approved")
+        .order("created_at", { ascending: false });
+
+      if (depData) {
+        setUserDeposits(depData.map(d => ({
+          ...d,
+          profiles: { email: found.email, full_name: found.full_name },
+        })));
+      }
+    } else {
+      toast({ title: "User Not Found", description: "No user matches that search.", variant: "destructive" });
+    }
+    setRemoveFundsSearching(false);
+  };
+
+  // Remove specific deposit
+  const handleRemoveDeposit = async (depositId: string) => {
+    if (!removeFundsReason.trim()) {
+      toast({ title: "Reason Required", description: "Please enter a reason for removing this deposit.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("deposits")
+        .update({
+          status: "declined",
+          admin_notes: `Removed by admin: ${removeFundsReason}`,
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: user?.id,
+        })
+        .eq("id", depositId);
+
+      if (error) throw error;
+
+      await logAdminAction("remove_deposit", "deposit", depositId, {
+        reason: removeFundsReason,
+        user_email: removeFundsUser?.email,
+      });
+
+      toast({ title: "Deposit Removed", description: "The deposit has been declined/removed." });
+      // Refresh
+      if (removeFundsUser) {
+        const { data: depData } = await supabase
+          .from("deposits")
+          .select("*")
+          .eq("user_id", removeFundsUser.user_id)
+          .eq("status", "approved")
+          .order("created_at", { ascending: false });
+        setUserDeposits((depData || []).map(d => ({
+          ...d,
+          profiles: { email: removeFundsUser.email, full_name: removeFundsUser.full_name },
+        })));
+      }
+      fetchAllData();
+    } catch (err) {
+      console.error("Error removing deposit:", err);
+      toast({ title: "Error", description: "Failed to remove deposit.", variant: "destructive" });
+    }
+  };
+
+  // Remove funds by amount (creates a negative withdrawal record)
+  const handleRemoveFundsByAmount = async () => {
+    if (!removeFundsUser || !removeFundsAmount || !removeFundsReason.trim()) {
+      toast({ title: "Missing Info", description: "Please fill in amount and reason.", variant: "destructive" });
+      return;
+    }
+
+    const inputAmount = parseFloat(removeFundsAmount);
+    if (isNaN(inputAmount) || inputAmount <= 0) {
+      toast({ title: "Invalid Amount", description: "Enter a valid amount.", variant: "destructive" });
+      return;
+    }
+
+    setIsRemovingFunds(true);
+    try {
+      let btcAmount = inputAmount;
+
+      if (removeFundsCurrency === "USD") {
+        const { data: cryptoData } = await supabase.functions.invoke("crypto-data", { body: {} });
+        const price = cryptoData?.find((c: any) => c.symbol === "BTC")?.price || btcPrice;
+        btcAmount = inputAmount / price;
+      }
+
+      // Create a declined deposit to subtract from balance, or update an approved withdrawal
+      // Best approach: create an approved withdrawal record (deducts from balance)
+      const { error } = await supabase.from("withdrawals").insert({
+        user_id: removeFundsUser.user_id,
+        amount: btcAmount,
+        wallet_address: "ADMIN_REMOVAL",
+        status: "approved",
+        payment_method: "Admin Removal",
+        admin_txid: `ADMIN_REMOVE_${Date.now()}`,
+        decline_reason: null,
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: user?.id,
+      });
+
+      if (error) throw error;
+
+      await logAdminAction("remove_funds", "withdrawal", removeFundsUser.user_id, {
+        email: removeFundsUser.email,
+        amount: btcAmount,
+        inputAmount,
+        currency: removeFundsCurrency,
+        reason: removeFundsReason,
+      });
+
+      toast({
+        title: "Funds Removed",
+        description: `${btcAmount.toFixed(8)} BTC (${inputAmount} ${removeFundsCurrency}) removed from ${removeFundsUser.email}. Reason: ${removeFundsReason}`,
+      });
+
+      setRemoveFundsAmount("");
+      setRemoveFundsReason("");
+      fetchAllData();
+    } catch (err) {
+      console.error("Error removing funds:", err);
+      toast({ title: "Error", description: "Failed to remove funds.", variant: "destructive" });
+    } finally {
+      setIsRemovingFunds(false);
+    }
+  };
+
   const handleToggleDeposits = async (enabled: boolean) => {
     setDepositsEnabled(enabled);
     // Immediately save to site_settings
@@ -1677,6 +1838,7 @@ const Admin = () => {
             <TabsTrigger value="activity" className="text-xs md:text-sm">Activity Feed</TabsTrigger>
             <TabsTrigger value="logs" className="text-xs md:text-sm">Admin Logs</TabsTrigger>
             <TabsTrigger value="add-funds" className="text-xs md:text-sm">Add Funds</TabsTrigger>
+            <TabsTrigger value="remove-funds" className="text-xs md:text-sm">Remove Funds</TabsTrigger>
             <TabsTrigger value="settings" className="text-xs md:text-sm">Settings</TabsTrigger>
           </TabsList>
 
@@ -2455,6 +2617,148 @@ const Admin = () => {
                       <Plus className="w-4 h-4 mr-2" />
                       {isAddingFunds ? "Adding..." : `Add ${addFundsAmount || "0"} ${addFundsCurrency} (${addFundsStatus})`}
                     </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Remove Funds Tab */}
+          <TabsContent value="remove-funds">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+                  <MinusCircle className="w-5 h-5 text-destructive" />
+                  Remove Funds
+                </CardTitle>
+                <CardDescription>Search for a user and remove funds by amount or reverse a specific deposit</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* User Search */}
+                <div className="space-y-2">
+                  <Label>Search User (email, phone, or username)</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Enter email, phone, or username..."
+                      value={removeFundsSearch}
+                      onChange={(e) => setRemoveFundsSearch(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleSearchUserForRemoval()}
+                    />
+                    <Button onClick={handleSearchUserForRemoval} disabled={removeFundsSearching}>
+                      <Search className="w-4 h-4 mr-2" />
+                      {removeFundsSearching ? "Searching..." : "Search"}
+                    </Button>
+                  </div>
+                </div>
+
+                {removeFundsUser && (
+                  <div className="space-y-6">
+                    {/* User Info */}
+                    <div className="p-4 bg-muted/30 rounded-lg">
+                      <p className="font-medium">{removeFundsUser.full_name || "No Name"}</p>
+                      <p className="text-sm text-muted-foreground">{removeFundsUser.email}</p>
+                      {removeFundsUser.phone && <p className="text-xs text-muted-foreground">Phone: {removeFundsUser.phone}</p>}
+                    </div>
+
+                    {/* Remove by Amount */}
+                    <div className="space-y-4 p-4 border border-destructive/20 rounded-lg">
+                      <h3 className="font-medium flex items-center gap-2">
+                        <MinusCircle className="w-4 h-4 text-destructive" />
+                        Remove by Amount
+                      </h3>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label>Amount</Label>
+                          <div className="flex gap-2">
+                            <Input
+                              type="number"
+                              step="0.0001"
+                              placeholder="Enter amount"
+                              value={removeFundsAmount}
+                              onChange={(e) => setRemoveFundsAmount(e.target.value)}
+                            />
+                            <Select value={removeFundsCurrency} onValueChange={(v: "BTC" | "USD") => setRemoveFundsCurrency(v)}>
+                              <SelectTrigger className="w-24">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="USD">USD</SelectItem>
+                                <SelectItem value="BTC">BTC</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {removeFundsAmount && parseFloat(removeFundsAmount) > 0 && (
+                            <p className="text-xs text-muted-foreground">
+                              {removeFundsCurrency === "USD"
+                                ? `≈ ${(parseFloat(removeFundsAmount) / btcPrice).toFixed(8)} BTC`
+                                : `≈ $${(parseFloat(removeFundsAmount) * btcPrice).toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
+                            </p>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Reason (required)</Label>
+                          <Textarea
+                            placeholder="Why are you removing these funds?"
+                            value={removeFundsReason}
+                            onChange={(e) => setRemoveFundsReason(e.target.value)}
+                            rows={2}
+                          />
+                        </div>
+                      </div>
+                      <Button
+                        variant="destructive"
+                        onClick={handleRemoveFundsByAmount}
+                        disabled={isRemovingFunds || !removeFundsAmount || !removeFundsReason.trim()}
+                      >
+                        <MinusCircle className="w-4 h-4 mr-2" />
+                        {isRemovingFunds ? "Removing..." : "Remove Funds"}
+                      </Button>
+                    </div>
+
+                    {/* Remove Specific Deposit */}
+                    <div className="space-y-4 p-4 border border-border rounded-lg">
+                      <h3 className="font-medium flex items-center gap-2">
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                        Reverse a Specific Deposit
+                      </h3>
+                      <div className="space-y-2">
+                        <Label>Reason for reversal (required)</Label>
+                        <Input
+                          placeholder="Enter reason..."
+                          value={removeFundsReason}
+                          onChange={(e) => setRemoveFundsReason(e.target.value)}
+                        />
+                      </div>
+                      {userDeposits.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">No approved deposits found for this user.</p>
+                      ) : (
+                        <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                          {userDeposits.map((dep) => (
+                            <div key={dep.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                              <div className="space-y-1">
+                                <p className="text-sm font-medium">
+                                  ${(dep.amount * btcPrice).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  <span className="text-xs text-muted-foreground ml-2">({dep.amount.toFixed(8)} BTC)</span>
+                                </p>
+                                {dep.payment_method && (
+                                  <p className="text-xs text-muted-foreground">Method: {dep.payment_method}</p>
+                                )}
+                                <p className="text-xs text-muted-foreground">{formatDate(dep.created_at)}</p>
+                                {dep.admin_notes && <p className="text-xs text-muted-foreground">Note: {dep.admin_notes}</p>}
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => handleRemoveDeposit(dep.id)}
+                                disabled={!removeFundsReason.trim()}
+                              >
+                                <Trash2 className="w-3 h-3 mr-1" />Remove
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </CardContent>
