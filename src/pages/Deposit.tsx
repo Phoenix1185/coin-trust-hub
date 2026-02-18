@@ -29,6 +29,7 @@ interface PaymentMethod {
   description: string | null;
   wallet_address: string | null;
   instructions: string | null;
+  network_addresses: Record<string, string> | null;
 }
 
 interface Deposit {
@@ -103,7 +104,10 @@ const Deposit = () => {
       .order("display_order", { ascending: true });
 
     if (!error && data) {
-      setPaymentMethods(data);
+      setPaymentMethods(data.map((d: any) => ({
+        ...d,
+        network_addresses: (typeof d.network_addresses === 'object' && d.network_addresses !== null ? d.network_addresses : null) as Record<string, string> | null,
+      })));
       if (data.length > 0) {
         setSelectedMethod(data[0].id);
       }
@@ -379,44 +383,66 @@ const Deposit = () => {
                     </Select>
                   </div>
 
-                  {selectedPaymentMethod.wallet_address && (
-                    <>
-                      <div className="flex justify-center p-4 bg-white rounded-lg">
-                        <img
-                          src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${selectedPaymentMethod.wallet_address}`}
-                          alt="QR Code"
-                          className="w-40 h-40"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>{selectedPaymentMethod.name} Address {selectedNetwork && `(${selectedNetwork})`}</Label>
-                        <div className="flex gap-2">
-                          <Input
-                            value={selectedPaymentMethod.wallet_address}
-                            readOnly
-                            className="font-mono text-sm"
-                          />
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => handleCopyAddress(selectedPaymentMethod.wallet_address!)}
-                          >
-                            {copied ? (
-                              <CheckCircle className="w-4 h-4 text-success" />
-                            ) : (
-                              <Copy className="w-4 h-4" />
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    </>
-                  )}
+                  {(() => {
+                    // Get address: first try network_addresses for the selected network, then fall back to wallet_address
+                    const networkAddr = selectedNetwork && selectedPaymentMethod.network_addresses
+                      ? selectedPaymentMethod.network_addresses[selectedNetwork]
+                      : null;
+                    const displayAddress = networkAddr || selectedPaymentMethod.wallet_address;
 
-                  {!selectedPaymentMethod.wallet_address && (
-                    <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-                      <p className="text-sm text-destructive">No deposit address configured for this payment method. Please contact support.</p>
-                    </div>
-                  )}
+                    if (selectedNetwork && displayAddress) {
+                      return (
+                        <>
+                          <div className="flex justify-center p-4 bg-white rounded-lg">
+                            <img
+                              src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${displayAddress}`}
+                              alt="QR Code"
+                              className="w-40 h-40"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>{selectedPaymentMethod.name} Address ({selectedNetwork})</Label>
+                            <div className="flex gap-2">
+                              <Input
+                                value={displayAddress}
+                                readOnly
+                                className="font-mono text-sm"
+                              />
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => handleCopyAddress(displayAddress)}
+                              >
+                                {copied ? (
+                                  <CheckCircle className="w-4 h-4 text-success" />
+                                ) : (
+                                  <Copy className="w-4 h-4" />
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    }
+
+                    if (selectedNetwork && !displayAddress) {
+                      return (
+                        <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                          <p className="text-sm text-destructive">No deposit address configured for {selectedNetwork}. Please contact support or try another network.</p>
+                        </div>
+                      );
+                    }
+
+                    if (!selectedNetwork) {
+                      return (
+                        <div className="p-4 bg-muted/50 border border-border rounded-lg">
+                          <p className="text-sm text-muted-foreground">Please select a network above to see the deposit address.</p>
+                        </div>
+                      );
+                    }
+
+                    return null;
+                  })()}
 
                   {selectedPaymentMethod.instructions && (
                     <div className="p-3 bg-warning/10 border border-warning/20 rounded-lg">
