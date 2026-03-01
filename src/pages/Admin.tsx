@@ -1458,15 +1458,56 @@ const Admin = () => {
     setRemoveFundsSearching(false);
   };
 
-  // Remove specific deposit
+  // Smart Remove specific deposit - cancel investments, handle debt
   const handleRemoveDeposit = async (depositId: string) => {
     if (!removeFundsReason.trim()) {
       toast({ title: "Reason Required", description: "Please enter a reason for removing this deposit.", variant: "destructive" });
       return;
     }
+    if (!removeFundsUser) return;
 
+    setIsRemovingFunds(true);
     try {
-      const { error } = await supabase
+      const deposit = userDeposits.find(d => d.id === depositId);
+      if (!deposit) throw new Error("Deposit not found");
+
+      const depositAmount = deposit.amount;
+
+      // 1. Get user's current balance
+      const { data: balanceData } = await supabase.rpc("get_user_balance", { _user_id: removeFundsUser.user_id });
+      const currentBalance = Number(balanceData) || 0;
+
+      // 2. Get active/pending investments
+      const { data: activeInvestments } = await supabase
+        .from("user_investments")
+        .select("*")
+        .eq("user_id", removeFundsUser.user_id)
+        .in("status", ["active", "pending"]);
+
+      let investmentsCancelled = 0;
+      let freedCapital = 0;
+
+      // 3. If balance < deposit amount, cancel investments to free up capital
+      if (currentBalance < depositAmount && activeInvestments && activeInvestments.length > 0) {
+        for (const inv of activeInvestments) {
+          if (currentBalance + freedCapital >= depositAmount) break;
+          
+          const { error: cancelErr } = await supabase
+            .from("user_investments")
+            .update({ status: "cancelled" })
+            .eq("id", inv.id);
+          
+          if (!cancelErr) {
+            freedCapital += Number(inv.amount);
+            investmentsCancelled++;
+          }
+        }
+      }
+
+      const availableAfterCancellations = currentBalance + freedCapital;
+
+      // 4. Decline the deposit
+      await supabase
         .from("deposits")
         .update({
           status: "declined",
@@ -1476,35 +1517,90 @@ const Admin = () => {
         })
         .eq("id", depositId);
 
-      if (error) throw error;
+      // 5. If deposit was already partially used (withdrawn), create debt record
+      let debtAmount = 0;
+      if (availableAfterCancellations < 0) {
+        // The balance was already negative or removal creates a deficit
+        debtAmount = Math.abs(availableAfterCancellations);
+      } else if (depositAmount > availableAfterCancellations + depositAmount) {
+        // Edge case: shouldn't happen but safety
+        debtAmount = depositAmount - availableAfterCancellations;
+      }
+      
+      // Calculate how much of the deposit had been spent (withdrawn by user)
+      // After declining the deposit, the balance would drop by depositAmount
+      // If balance was less than depositAmount, the difference is what was spent
+      const spentFromDeposit = depositAmount - Math.min(depositAmount, currentBalance + freedCapital);
+      
+      if (spentFromDeposit > 0) {
+        // Create debt record for the spent portion
+        await supabase.from("withdrawals").insert({
+          user_id: removeFundsUser.user_id,
+          amount: spentFromDeposit,
+          wallet_address: "ADMIN_DEBT_RECOVERY",
+          status: "approved",
+          payment_method: "Admin Debt Recovery",
+          admin_txid: `DEBT_${Date.now()}`,
+          decline_reason: `Debt from reversed deposit. Original deposit: ${depositAmount.toFixed(8)} BTC. User had already spent ${spentFromDeposit.toFixed(8)} BTC. Reason: ${removeFundsReason}`,
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: user?.id,
+        });
+        debtAmount = spentFromDeposit;
+      }
+
+      // 6. Send email notification
+      const usdValue = (depositAmount * btcPrice).toFixed(2);
+      sendEmailNotification("funds_removed", removeFundsUser.user_id, {
+        amount_btc: depositAmount.toFixed(8),
+        amount_usd: usdValue,
+        reason: removeFundsReason,
+        debt_amount: debtAmount > 0 ? debtAmount.toFixed(8) : null,
+        investments_cancelled: investmentsCancelled > 0 ? investmentsCancelled : null,
+      });
+
+      // 7. Create in-app notification
+      await supabase.from("notifications").insert({
+        user_id: removeFundsUser.user_id,
+        type: "system",
+        title: "Funds Removed",
+        message: `${depositAmount.toFixed(8)} BTC ($${usdValue}) has been removed from your account. Reason: ${removeFundsReason}${debtAmount > 0 ? `. A debt of ${debtAmount.toFixed(8)} BTC will be deducted from your next deposit.` : ''}${investmentsCancelled > 0 ? ` ${investmentsCancelled} investment(s) were cancelled.` : ''}`,
+      });
 
       await logAdminAction("remove_deposit", "deposit", depositId, {
         reason: removeFundsReason,
-        user_email: removeFundsUser?.email,
+        user_email: removeFundsUser.email,
+        deposit_amount: depositAmount,
+        debt_created: debtAmount,
+        investments_cancelled: investmentsCancelled,
       });
 
-      toast({ title: "Deposit Removed", description: "The deposit has been declined/removed." });
-      // Refresh
-      if (removeFundsUser) {
-        const { data: depData } = await supabase
-          .from("deposits")
-          .select("*")
-          .eq("user_id", removeFundsUser.user_id)
-          .eq("status", "approved")
-          .order("created_at", { ascending: false });
-        setUserDeposits((depData || []).map(d => ({
-          ...d,
-          profiles: { email: removeFundsUser.email, full_name: removeFundsUser.full_name },
-        })));
-      }
+      toast({
+        title: "Deposit Removed",
+        description: `${depositAmount.toFixed(8)} BTC removed.${investmentsCancelled > 0 ? ` ${investmentsCancelled} investments cancelled.` : ''}${debtAmount > 0 ? ` Debt of ${debtAmount.toFixed(8)} BTC created.` : ''}`,
+      });
+
+      // Refresh deposits list
+      const { data: depData } = await supabase
+        .from("deposits")
+        .select("*")
+        .eq("user_id", removeFundsUser.user_id)
+        .eq("status", "approved")
+        .order("created_at", { ascending: false });
+      setUserDeposits((depData || []).map(d => ({
+        ...d,
+        profiles: { email: removeFundsUser.email, full_name: removeFundsUser.full_name },
+      })));
+
       fetchAllData();
     } catch (err) {
       console.error("Error removing deposit:", err);
       toast({ title: "Error", description: "Failed to remove deposit.", variant: "destructive" });
+    } finally {
+      setIsRemovingFunds(false);
     }
   };
 
-  // Remove funds by amount (creates a negative withdrawal record)
+  // Smart Remove funds by amount - cancel investments if needed, handle debt
   const handleRemoveFundsByAmount = async () => {
     if (!removeFundsUser || !removeFundsAmount || !removeFundsReason.trim()) {
       toast({ title: "Missing Info", description: "Please fill in amount and reason.", variant: "destructive" });
@@ -1520,28 +1616,100 @@ const Admin = () => {
     setIsRemovingFunds(true);
     try {
       let btcAmount = inputAmount;
+      let usdValue = inputAmount;
 
       if (removeFundsCurrency === "USD") {
-        const { data: cryptoData } = await supabase.functions.invoke("crypto-data", { body: {} });
-        const price = cryptoData?.find((c: any) => c.symbol === "BTC")?.price || btcPrice;
-        btcAmount = inputAmount / price;
+        btcAmount = inputAmount / btcPrice;
+        usdValue = inputAmount;
+      } else {
+        usdValue = inputAmount * btcPrice;
       }
 
-      // Create a declined deposit to subtract from balance, or update an approved withdrawal
-      // Best approach: create an approved withdrawal record (deducts from balance)
-      const { error } = await supabase.from("withdrawals").insert({
-        user_id: removeFundsUser.user_id,
-        amount: btcAmount,
-        wallet_address: "ADMIN_REMOVAL",
-        status: "approved",
-        payment_method: "Admin Removal",
-        admin_txid: `ADMIN_REMOVE_${Date.now()}`,
-        decline_reason: null,
-        reviewed_at: new Date().toISOString(),
-        reviewed_by: user?.id,
+      // 1. Get user's current balance
+      const { data: balanceData } = await supabase.rpc("get_user_balance", { _user_id: removeFundsUser.user_id });
+      const currentBalance = Number(balanceData) || 0;
+
+      // 2. Get active/pending investments
+      const { data: activeInvestments } = await supabase
+        .from("user_investments")
+        .select("*")
+        .eq("user_id", removeFundsUser.user_id)
+        .in("status", ["active", "pending"]);
+
+      let investmentsCancelled = 0;
+      let freedCapital = 0;
+
+      // 3. If balance < removal amount, cancel investments
+      if (currentBalance < btcAmount && activeInvestments && activeInvestments.length > 0) {
+        for (const inv of activeInvestments) {
+          if (currentBalance + freedCapital >= btcAmount) break;
+
+          const { error: cancelErr } = await supabase
+            .from("user_investments")
+            .update({ status: "cancelled" })
+            .eq("id", inv.id);
+
+          if (!cancelErr) {
+            freedCapital += Number(inv.amount);
+            investmentsCancelled++;
+          }
+        }
+      }
+
+      const availableAfterCancellations = currentBalance + freedCapital;
+      let debtAmount = 0;
+
+      if (btcAmount > availableAfterCancellations) {
+        debtAmount = btcAmount - availableAfterCancellations;
+      }
+
+      // 4. Create removal withdrawal for the removable portion
+      const removableAmount = Math.min(btcAmount, availableAfterCancellations);
+      if (removableAmount > 0) {
+        await supabase.from("withdrawals").insert({
+          user_id: removeFundsUser.user_id,
+          amount: removableAmount,
+          wallet_address: "ADMIN_REMOVAL",
+          status: "approved",
+          payment_method: "Admin Removal",
+          admin_txid: `ADMIN_REMOVE_${Date.now()}`,
+          decline_reason: `Admin removal: ${removeFundsReason}`,
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: user?.id,
+        });
+      }
+
+      // 5. If debt, create debt recovery record
+      if (debtAmount > 0) {
+        await supabase.from("withdrawals").insert({
+          user_id: removeFundsUser.user_id,
+          amount: debtAmount,
+          wallet_address: "ADMIN_DEBT_RECOVERY",
+          status: "approved",
+          payment_method: "Admin Debt Recovery",
+          admin_txid: `DEBT_${Date.now()}`,
+          decline_reason: `Debt from fund removal. Removed ${btcAmount.toFixed(8)} BTC but only ${availableAfterCancellations.toFixed(8)} BTC was available. Reason: ${removeFundsReason}`,
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: user?.id,
+        });
+      }
+
+      // 6. Send email notification
+      sendEmailNotification("funds_removed", removeFundsUser.user_id, {
+        amount_btc: btcAmount.toFixed(8),
+        amount_usd: usdValue.toFixed(2),
+        reason: removeFundsReason,
+        debt_amount: debtAmount > 0 ? debtAmount.toFixed(8) : null,
+        investments_cancelled: investmentsCancelled > 0 ? investmentsCancelled : null,
       });
 
-      if (error) throw error;
+      // 7. In-app notification
+      await supabase.from("notifications").insert({
+        user_id: removeFundsUser.user_id,
+        type: "system",
+        title: "Funds Removed",
+        message: `${btcAmount.toFixed(8)} BTC ($${usdValue.toFixed(2)}) has been removed from your account. Reason: ${removeFundsReason}${debtAmount > 0 ? `. A debt of ${debtAmount.toFixed(8)} BTC will be deducted from your next deposit.` : ''}${investmentsCancelled > 0 ? ` ${investmentsCancelled} investment(s) were cancelled.` : ''}`,
+      });
 
       await logAdminAction("remove_funds", "withdrawal", removeFundsUser.user_id, {
         email: removeFundsUser.email,
@@ -1549,11 +1717,13 @@ const Admin = () => {
         inputAmount,
         currency: removeFundsCurrency,
         reason: removeFundsReason,
+        debt_created: debtAmount,
+        investments_cancelled: investmentsCancelled,
       });
 
       toast({
         title: "Funds Removed",
-        description: `${btcAmount.toFixed(8)} BTC (${inputAmount} ${removeFundsCurrency}) removed from ${removeFundsUser.email}. Reason: ${removeFundsReason}`,
+        description: `${btcAmount.toFixed(8)} BTC ($${usdValue.toFixed(2)}) removed from ${removeFundsUser.email}.${investmentsCancelled > 0 ? ` ${investmentsCancelled} investments cancelled.` : ''}${debtAmount > 0 ? ` Debt: ${debtAmount.toFixed(8)} BTC.` : ''}`,
       });
 
       setRemoveFundsAmount("");

@@ -430,6 +430,15 @@ const Withdraw = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        {profile?.is_frozen && (
+          <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
+            <div>
+              <p className="font-medium text-destructive">Account Frozen</p>
+              <p className="text-sm text-muted-foreground">Your account has been temporarily frozen. Withdrawals are disabled. Please contact support for assistance.</p>
+            </div>
+          </div>
+        )}
         <div>
           <h1 className="text-2xl font-bold">Withdraw</h1>
           <p className="text-muted-foreground">Withdraw funds to your wallet</p>
@@ -633,7 +642,7 @@ const Withdraw = () => {
                 <Button
                   type="submit"
                   className="w-full"
-                  disabled={isSubmitting || !canWithdraw || mainBalance <= 0 || !selectedMethod}
+                  disabled={isSubmitting || !canWithdraw || mainBalance <= 0 || !selectedMethod || !!profile?.is_frozen}
                 >
                   {isSubmitting ? "Submitting..." : "Request Withdrawal"}
                 </Button>
