@@ -255,6 +255,25 @@ serve(async (req) => {
         ].join('\n');
         break;
 
+      case "funds_removed":
+        subject = "Funds Removed from Your Account";
+        body = [
+          `<p>Hi ${userName},</p>`,
+          `<p>An administrative action has been taken on your account. The following funds have been removed:</p>`,
+          '<table cellpadding="0" cellspacing="0" style="width:100%;margin:15px 0;">',
+          '<tr><td style="padding:8px 12px;background:#0d0d1a;border-radius:8px 8px 0 0;color:#999;font-size:13px;">Amount Removed</td>',
+          `<td style="padding:8px 12px;background:#0d0d1a;border-radius:8px 8px 0 0;color:#ff6b6b;font-weight:600;font-size:15px;text-align:right;">${data.amount_btc || "N/A"} BTC</td></tr>`,
+          data.amount_usd ? `<tr><td style="padding:8px 12px;background:#111;color:#999;font-size:13px;">USD Value</td><td style="padding:8px 12px;background:#111;color:#e0e0e0;text-align:right;">$${data.amount_usd}</td></tr>` : '',
+          `<tr><td style="padding:8px 12px;background:#0d0d1a;border-radius:0 0 8px 8px;color:#999;font-size:13px;">Reason</td>`,
+          `<td style="padding:8px 12px;background:#0d0d1a;border-radius:0 0 8px 8px;color:#ff6b6b;font-size:13px;text-align:right;">${data.reason || "Not specified"}</td></tr>`,
+          '</table>',
+          data.debt_amount ? `<p style="color:#ff6b6b;"><strong>Note:</strong> A debt of <strong>${data.debt_amount} BTC</strong> has been recorded and will be deducted from your next deposit.</p>` : '',
+          data.investments_cancelled ? `<p style="color:#ffaa00;"><strong>${data.investments_cancelled} active investment(s)</strong> were cancelled as part of this action.</p>` : '',
+          '<p>If you believe this is an error or have questions, please contact our support team.</p>',
+          makeButton('Contact Support', `${SITE_URL}/support`),
+        ].join('\n');
+        break;
+
       default:
         subject = data.subject || `Notification from ${SENDER_NAME}`;
         body = `<p>${data.message || "You have a new notification."}</p>`;

@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Copy, CheckCircle, Clock, XCircle, QrCode, Wallet, CreditCard, Landmark, Bitcoin, Info } from "lucide-react";
+import { Copy, CheckCircle, Clock, XCircle, QrCode, Wallet, CreditCard, Landmark, Bitcoin, Info, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -248,6 +248,15 @@ const Deposit = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        {profile?.is_frozen && (
+          <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
+            <div>
+              <p className="font-medium text-destructive">Account Frozen</p>
+              <p className="text-sm text-muted-foreground">Your account has been temporarily frozen. Deposits are disabled. Please contact support for assistance.</p>
+            </div>
+          </div>
+        )}
         <div>
           <h1 className="text-2xl font-bold">Deposit</h1>
           <p className="text-muted-foreground">Add funds to your account</p>
@@ -540,7 +549,7 @@ const Deposit = () => {
                 <Button
                   type="submit"
                   className="w-full bg-success hover:bg-success/90"
-                  disabled={isSubmitting || !selectedMethod}
+                  disabled={isSubmitting || !selectedMethod || !!profile?.is_frozen}
                 >
                   {isSubmitting ? "Submitting..." : "Submit Deposit"}
                 </Button>

@@ -9,6 +9,7 @@ interface Profile {
   email: string;
   avatar_url: string | null;
   preferred_currency: CurrencyCode;
+  is_frozen: boolean | null;
 }
 
 interface AuthContextType {
@@ -75,7 +76,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const { data, error } = await supabase
         .from("profiles")
-        .select("full_name, email, avatar_url, preferred_currency")
+        .select("full_name, email, avatar_url, preferred_currency, is_frozen")
         .eq("user_id", userId)
         .maybeSingle();
 
@@ -88,6 +89,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setProfile({
           ...data,
           preferred_currency: (data.preferred_currency as CurrencyCode) || "USD",
+          is_frozen: data.is_frozen ?? false,
         });
       }
     } catch (err) {
