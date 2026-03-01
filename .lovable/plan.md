@@ -1,40 +1,118 @@
 
 
-# Deposit Guide / How-To Instructions
+# Smart Funds Removal, Account Freeze Enforcement, and Email Notifications
 
 ## Overview
-Add a beginner-friendly "How to Deposit" guide page that walks users through buying crypto and depositing on the platform. Also add entry points to this guide from the Deposit page and the landing page.
 
-## What Will Be Built
+This plan addresses several interconnected issues:
+1. **Smart fund removal** that handles edge cases (active investments, partial withdrawals, negative balances)
+2. **Account freeze enforcement** on the user side (block deposits, withdrawals, investments)
+3. **Email notification for fund removal** with admin-provided reason
+4. **New "funds_removed" email template** in the send-email Edge Function
 
-### 1. New Page: `/deposit-guide`
-A standalone guide page (accessible to both logged-in and logged-out users) with step-by-step instructions covering:
+---
 
-- **Step 1: Create a crypto exchange account** -- Brief explanation of popular exchanges (Binance, Coinbase, Bybit, etc.) with tips for beginners
-- **Step 2: Buy cryptocurrency** -- How to purchase BTC, USDT, or USDC using a debit card, bank transfer, or P2P
-- **Step 3: Send crypto to BitCryptoTradingCo** -- How to copy the deposit address from the platform and send funds from the exchange, with warnings about selecting the correct network
-- **Step 4: Submit your deposit** -- How to fill out the deposit form and paste the transaction ID
+## 1. Smart Fund Removal Logic (Admin.tsx)
 
-Each step will include practical tips and common mistakes to avoid (e.g., sending on the wrong network, minimum amounts).
+### Current Problem
+When admin removes funds, it just creates a withdrawal record. It does NOT check if the user has active investments funded by those funds or if the user already withdrew part of them.
 
-A "Supported Payment Methods" section will list available options (BTC, USDT, USDC, PayPal, Bank Transfer) with brief notes on each.
+### New Behavior
+When admin removes a deposit or amount:
 
-### 2. Entry Points to the Guide
-- **Deposit page**: Add an info banner/link at the top -- "New to crypto? Read our deposit guide" linking to `/deposit-guide`
-- **Landing page footer**: Add a "How to Deposit" link alongside FAQ, Terms, etc.
-- **FAQ page footer**: Add a link to the guide
+**A. Removing a specific deposit:**
+1. Check if user has active/pending investments funded from that deposit's funds
+2. If yes, cancel those investments (set status to `cancelled`, return capital to available)
+3. Calculate how much of the deposit has already been withdrawn
+4. If partially withdrawn (e.g., deposited $50, withdrew $40), only remove the remaining $10 available, and create a **negative balance record** (-$40) that will be deducted from the user's next deposit
+5. Send notification to user AND admin about the removal
 
-### 3. Route Registration
-Add the `/deposit-guide` route in `App.tsx`.
+**B. Removing by amount:**
+- Same logic: check if removal would require cancelling investments, handle accordingly
+- If removal exceeds available balance, create a negative balance (debt) record
+
+### Negative Balance Handling
+- A negative balance is recorded as an approved withdrawal with `wallet_address = "ADMIN_DEBT_RECOVERY"` and a `decline_reason` explaining it
+- When the user's next deposit is approved, the admin sees a warning that this user has outstanding debt
+- The `get_user_balance` function naturally handles this since approved withdrawals are subtracted
+
+---
+
+## 2. Account Freeze Enforcement (User-Side Pages)
+
+### Current Problem
+When an account is frozen, only `is_frozen = true` is set on the profile. But **nothing** on the user side actually blocks actions.
+
+### Changes
+Add frozen checks to these pages:
+- **Deposit.tsx**: Show a warning banner and disable the deposit form
+- **Withdraw.tsx**: Show a warning banner and disable the withdrawal form
+- **Investments.tsx**: Show a warning banner and disable the invest button
+
+Each page already has access to `profile` from `useAuth()`, so we just check `profile?.is_frozen`.
+
+---
+
+## 3. Email Notification for Fund Removal
+
+### send-email Edge Function
+Add a new email type `"funds_removed"` with:
+- The amount removed (BTC and USD)
+- The admin-provided reason
+- A professional "Contact Support" CTA button
+
+### Admin.tsx Integration
+After removing funds (both by amount and by specific deposit), call `sendEmailNotification("funds_removed", ...)` with the reason and amount.
+
+Also send a notification to the admin email about the action for record-keeping.
+
+---
+
+## 4. In-App Notification for Fund Removal
+
+Create an in-app notification for the user when funds are removed, so they see it in their notification dropdown too.
+
+---
 
 ## Technical Details
 
 | Change | File |
 |--------|------|
-| New page component | `src/pages/DepositGuide.tsx` |
-| Add route | `src/App.tsx` |
-| Add guide link banner | `src/pages/Deposit.tsx` |
-| Add footer link | `src/pages/Index.tsx` |
-| Add footer link | `src/pages/FAQ.tsx` |
+| Smart removal logic with investment cancellation and debt handling | `src/pages/Admin.tsx` |
+| Frozen account checks (deposit blocked) | `src/pages/Deposit.tsx` |
+| Frozen account checks (withdrawal blocked) | `src/pages/Withdraw.tsx` |
+| Frozen account checks (investment blocked) | `src/pages/Investments.tsx` |
+| Add "funds_removed" email template | `supabase/functions/send-email/index.ts` |
 
-The guide page will reuse the same header/footer pattern as the FAQ and legal pages (Logo header, back button, footer links). No database changes needed -- all content is static.
+### Key Logic for Smart Removal (pseudo-code)
+
+```text
+handleRemoveDeposit(depositId):
+  1. Get deposit amount
+  2. Get user's total approved withdrawals
+  3. Get user's active/pending investments
+  4. Calculate available = balance from get_user_balance RPC
+  5. If deposit amount > available:
+     - Cancel active investments if needed (free up capital)
+     - Recalculate available after cancellations
+     - If still not enough: remaining deficit becomes debt
+       (approved withdrawal with ADMIN_DEBT_RECOVERY marker)
+     - Remove what's available
+  6. Decline the deposit record
+  7. Send "funds_removed" email with reason
+  8. Create in-app notification
+  9. Log admin action
+```
+
+### Frozen Account UI Pattern
+
+```text
+if (profile?.is_frozen) {
+  Show alert banner: "Your account has been frozen. 
+  Contact support for assistance."
+  Disable all action buttons/forms
+  return early (don't render action forms)
+}
+```
+
+No database migrations needed -- all changes are in application code and the Edge Function.
