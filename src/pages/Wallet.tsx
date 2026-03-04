@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { ArrowDownCircle, ArrowUpCircle, Bitcoin, Wallet as WalletIcon, TrendingUp, History, Lock } from "lucide-react";
+import { getStatusLabel, getStatusColorClass } from "@/lib/statusLabels";
 import { cn } from "@/lib/utils";
 
 interface Transaction {
@@ -319,8 +320,8 @@ const Wallet = () => {
                       <div className="text-xs text-muted-foreground">
                         {formatBTC(tx.amount)}
                       </div>
-                      <div className={cn("text-sm capitalize", getStatusColor(tx.status))}>
-                        {tx.status}
+                      <div className={cn("text-sm", getStatusColorClass(tx.status))}>
+                        {getStatusLabel(tx.status, tx.type)}
                       </div>
                     </div>
                   </div>

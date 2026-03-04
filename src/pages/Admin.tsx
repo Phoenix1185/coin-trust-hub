@@ -734,7 +734,7 @@ const Admin = () => {
         payment_method: deposit.payment_method,
       });
 
-      toast({ title: "Deposit Approved", description: `${deposit.amount.toFixed(4)} BTC approved successfully.` });
+      toast({ title: "Deposit Confirmed", description: `${deposit.amount.toFixed(4)} BTC confirmed successfully.` });
       fetchAllData();
     } catch (error) {
       console.error("Error approving deposit:", error);
@@ -764,7 +764,7 @@ const Admin = () => {
         reason: reason || "Declined by admin",
       });
 
-      toast({ title: "Deposit Declined", description: "Deposit has been declined." });
+      toast({ title: "Deposit Rejected", description: "Deposit has been marked as unconfirmed." });
       fetchAllData();
     } catch (error) {
       console.error("Error declining deposit:", error);
@@ -800,7 +800,7 @@ const Admin = () => {
         wallet_address: withdrawal.wallet_address,
       });
 
-      toast({ title: "Withdrawal Approved", description: `${withdrawal.amount.toFixed(4)} BTC sent successfully.` });
+      toast({ title: "Withdrawal Processed", description: `${withdrawal.amount.toFixed(4)} BTC sent successfully.` });
       fetchAllData();
     } catch (error) {
       console.error("Error approving withdrawal:", error);
@@ -829,7 +829,7 @@ const Admin = () => {
         reason: reason || "Request declined by admin.",
       });
 
-      toast({ title: "Withdrawal Declined", description: "Withdrawal has been declined." });
+      toast({ title: "Withdrawal Rejected", description: "Withdrawal has been rejected." });
       fetchAllData();
     } catch (error) {
       console.error("Error declining withdrawal:", error);
@@ -911,7 +911,7 @@ const Admin = () => {
         amount: investment.amount.toFixed(4),
       });
 
-      toast({ title: "Investment Declined", description: "Investment has been declined." });
+      toast({ title: "Investment Cancelled", description: "Investment has been cancelled." });
       fetchAllData();
     } catch (error) {
       console.error("Error declining investment:", error);
@@ -1839,22 +1839,30 @@ const Admin = () => {
     });
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, type: "deposit" | "withdrawal" | "investment" | "general" = "general") => {
+    const labels: Record<string, Record<string, string>> = {
+      deposit: { approved: "Confirmed", declined: "Unconfirmed", pending: "Pending" },
+      withdrawal: { approved: "Completed", declined: "Rejected", pending: "Processing" },
+      investment: { active: "Active", completed: "Matured", cancelled: "Cancelled", pending: "Pending" },
+      general: { approved: "Confirmed", declined: "Unconfirmed", pending: "Pending", active: "Active", completed: "Completed", cancelled: "Cancelled", open: "Open", resolved: "Resolved", closed: "Closed" },
+    };
+    const label = labels[type]?.[status] || labels.general[status] || status;
+
     switch (status) {
       case "pending":
       case "open":
-        return <Badge variant="outline" className="border-warning text-warning">{status}</Badge>;
+        return <Badge variant="outline" className="border-warning text-warning">{label}</Badge>;
       case "approved":
       case "active":
       case "completed":
       case "resolved":
-        return <Badge variant="outline" className="border-success text-success">{status}</Badge>;
+        return <Badge variant="outline" className="border-success text-success">{label}</Badge>;
       case "declined":
       case "cancelled":
       case "closed":
-        return <Badge variant="destructive">{status}</Badge>;
+        return <Badge variant="destructive">{label}</Badge>;
       default:
-        return <Badge variant="secondary">{status}</Badge>;
+        return <Badge variant="secondary">{label}</Badge>;
     }
   };
 
@@ -2037,7 +2045,7 @@ const Admin = () => {
                         onDecline={handleDeclineDeposit}
                         formatCurrency={formatCurrency}
                         formatDate={formatDate}
-                        getStatusBadge={getStatusBadge}
+                        getStatusBadge={(s: string) => getStatusBadge(s, "deposit")}
                       />
                     ))}
                   </div>
@@ -2071,7 +2079,7 @@ const Admin = () => {
                         onDecline={handleDeclineWithdrawal}
                         formatCurrency={formatCurrency}
                         formatDate={formatDate}
-                        getStatusBadge={getStatusBadge}
+                        getStatusBadge={(s: string) => getStatusBadge(s, "withdrawal")}
                       />
                     ))}
                   </div>
@@ -2119,7 +2127,7 @@ const Admin = () => {
                         <div className="space-y-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium text-sm md:text-base">{investment.profiles?.email || "Unknown"}</span>
-                            {getStatusBadge(investment.status)}
+                            {getStatusBadge(investment.status, "investment")}
                           </div>
                           <p className="text-sm text-muted-foreground">
                             Plan: {investment.investment_plans?.name} | Amount: <span className="text-primary font-semibold">{formatCurrency(investment.amount)}</span>
@@ -3492,19 +3500,19 @@ const DepositItem = ({
         <div className="space-y-3 pt-3 border-t border-border">
           {!showDecline ? (
             <div className="flex gap-2">
-              <Button size="sm" onClick={() => onApprove(deposit)} className="bg-success hover:bg-success/90">
-                <CheckCircle className="w-4 h-4 mr-1" />Approve
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setShowDecline(true)}>Decline</Button>
+               <Button size="sm" onClick={() => onApprove(deposit)} className="bg-success hover:bg-success/90">
+                 <CheckCircle className="w-4 h-4 mr-1" />Confirm
+               </Button>
+               <Button size="sm" variant="outline" onClick={() => setShowDecline(true)}>Reject</Button>
             </div>
           ) : (
             <>
-              <Input placeholder="Reason for decline (optional)" value={reason} onChange={(e) => setReason(e.target.value)} />
-              <div className="flex gap-2">
-                <Button size="sm" variant="destructive" onClick={() => onDecline(deposit, reason)}>
-                  <XCircle className="w-4 h-4 mr-1" />Confirm Decline
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => setShowDecline(false)}>Cancel</Button>
+               <Input placeholder="Reason for rejection (optional)" value={reason} onChange={(e) => setReason(e.target.value)} />
+               <div className="flex gap-2">
+                 <Button size="sm" variant="destructive" onClick={() => onDecline(deposit, reason)}>
+                   <XCircle className="w-4 h-4 mr-1" />Confirm Rejection
+                 </Button>
+                 <Button size="sm" variant="outline" onClick={() => setShowDecline(false)}>Cancel</Button>
               </div>
             </>
           )}
@@ -3562,17 +3570,17 @@ const WithdrawalItem = ({
               <Input placeholder="Enter Transaction ID (TXID)" value={txid} onChange={(e) => setTxid(e.target.value)} />
               <div className="flex gap-2">
                 <Button size="sm" onClick={() => onApprove(withdrawal, txid)} className="bg-success hover:bg-success/90" disabled={!txid.trim()}>
-                  <CheckCircle className="w-4 h-4 mr-1" />Approve
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => setShowDecline(true)}>Decline</Button>
+                   <CheckCircle className="w-4 h-4 mr-1" />Process
+                 </Button>
+                 <Button size="sm" variant="outline" onClick={() => setShowDecline(true)}>Reject</Button>
               </div>
             </>
           ) : (
             <>
-              <Input placeholder="Reason for decline (optional)" value={reason} onChange={(e) => setReason(e.target.value)} />
-              <div className="flex gap-2">
-                <Button size="sm" variant="destructive" onClick={() => onDecline(withdrawal, reason)}>
-                  <XCircle className="w-4 h-4 mr-1" />Confirm Decline
+               <Input placeholder="Reason for rejection" value={reason} onChange={(e) => setReason(e.target.value)} />
+               <div className="flex gap-2">
+                 <Button size="sm" variant="destructive" onClick={() => onDecline(withdrawal, reason)}>
+                   <XCircle className="w-4 h-4 mr-1" />Confirm Rejection
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => setShowDecline(false)}>Cancel</Button>
               </div>

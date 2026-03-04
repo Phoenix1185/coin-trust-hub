@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { CheckCircle, Clock, XCircle, AlertTriangle, ArrowUpCircle, Wallet, CreditCard, Landmark, Bitcoin, Save, Coins } from "lucide-react";
+import { getStatusLabel, getStatusColorClass } from "@/lib/statusLabels";
 import { cn } from "@/lib/utils";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -672,8 +673,8 @@ const Withdraw = () => {
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         {getStatusIcon(withdrawal.status)}
-                        <span className="font-medium capitalize">
-                          {withdrawal.status}
+                        <span className={cn("font-medium", getStatusColorClass(withdrawal.status))}>
+                          {getStatusLabel(withdrawal.status, "withdrawal")}
                         </span>
                         {withdrawal.payment_method && (
                           <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">

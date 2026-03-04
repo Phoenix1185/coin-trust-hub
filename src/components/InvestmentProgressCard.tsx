@@ -5,6 +5,7 @@ import { useInvestmentProgress } from "@/hooks/useInvestmentProgress";
 import { useBTCPrice } from "@/hooks/useBTCPrice";
 import { Clock, Zap, CheckCircle, AlertCircle, Lock, Timer, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getStatusLabel } from "@/lib/statusLabels";
 
 interface InvestmentProgressCardProps {
   investment: {
@@ -60,17 +61,18 @@ const InvestmentProgressCard = ({ investment, currency }: InvestmentProgressCard
   };
 
   const getStatusBadge = () => {
+    const label = getStatusLabel(investment.status, "investment");
     switch (investment.status) {
       case "active":
-        return <Badge variant="default" className="bg-success/20 text-success border-success/30">Active</Badge>;
+        return <Badge variant="default" className="bg-success/20 text-success border-success/30">{label}</Badge>;
       case "completed":
-        return <Badge variant="default" className="bg-primary/20 text-primary border-primary/30">Completed</Badge>;
+        return <Badge variant="default" className="bg-primary/20 text-primary border-primary/30">{label}</Badge>;
       case "pending":
-        return <Badge variant="default" className="bg-warning/20 text-warning border-warning/30">Pending Approval</Badge>;
+        return <Badge variant="default" className="bg-warning/20 text-warning border-warning/30">{label}</Badge>;
       case "cancelled":
-        return <Badge variant="default" className="bg-destructive/20 text-destructive border-destructive/30">Cancelled</Badge>;
+        return <Badge variant="default" className="bg-destructive/20 text-destructive border-destructive/30">{label}</Badge>;
       default:
-        return <Badge>{investment.status}</Badge>;
+        return <Badge>{label}</Badge>;
     }
   };
 
@@ -234,7 +236,7 @@ const InvestmentProgressCard = ({ investment, currency }: InvestmentProgressCard
               {formatFiatAmount(btcToUSD(investment.amount + progress.accruedProfit), currency)}
             </p>
             <p className="text-xs text-muted-foreground">
-              {formatBTC(investment.amount + progress.accruedProfit)} • Now withdrawable
+              {formatBTC(investment.amount + progress.accruedProfit)} • Now available for withdrawal
             </p>
           </div>
         )}
