@@ -22,6 +22,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getStatusLabel, getStatusColorClass } from "@/lib/statusLabels";
 
 interface DashboardStats {
   totalDeposits: number;
@@ -359,13 +360,8 @@ const Dashboard = () => {
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
                       {getStatusIcon(activity.status)}
-                      <span className={cn(
-                        "text-xs capitalize",
-                        (activity.status === "approved" || activity.status === "active" || activity.status === "completed") && "text-success",
-                        activity.status === "pending" && "text-warning",
-                        (activity.status === "declined" || activity.status === "cancelled") && "text-destructive"
-                      )}>
-                        {activity.status}
+                      <span className={cn("text-xs", getStatusColorClass(activity.status))}>
+                        {getStatusLabel(activity.status, activity.type)}
                       </span>
                     </div>
                   </div>

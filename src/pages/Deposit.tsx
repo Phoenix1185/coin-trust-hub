@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Copy, CheckCircle, Clock, XCircle, QrCode, Wallet, CreditCard, Landmark, Bitcoin, Info, AlertTriangle } from "lucide-react";
+import { getStatusLabel, getStatusColorClass } from "@/lib/statusLabels";
 import { cn } from "@/lib/utils";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -596,13 +597,11 @@ const Deposit = () => {
                       {getStatusIcon(deposit.status)}
                       <span
                         className={cn(
-                          "text-sm capitalize",
-                          deposit.status === "approved" && "text-success",
-                          deposit.status === "pending" && "text-warning",
-                          deposit.status === "declined" && "text-destructive"
+                          "text-sm",
+                          getStatusColorClass(deposit.status)
                         )}
                       >
-                        {deposit.status}
+                        {getStatusLabel(deposit.status, "deposit")}
                       </span>
                     </div>
                   </div>
