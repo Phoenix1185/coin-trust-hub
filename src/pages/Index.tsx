@@ -329,7 +329,7 @@ const Index = () => {
               </div>
             </div>
             <p className="text-sm text-muted-foreground text-center">
-              © 2024 BitCryptoTradingCo. All rights reserved.
+              © {new Date().getFullYear()} BitCryptoTradingCo. All rights reserved.
             </p>
           </div>
         </div>
