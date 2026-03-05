@@ -4,7 +4,7 @@ import Logo from "@/components/Logo";
 import CryptoChart from "@/components/CryptoChart";
 import LiveTicker from "@/components/LiveTicker";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Shield, TrendingUp, Users, Zap, Lock, Globe, ChevronDown, HelpCircle } from "lucide-react";
+import { ArrowRight, Shield, TrendingUp, Users, Zap, Lock, Globe, ChevronDown, HelpCircle, CheckCircle, Wallet, BarChart3, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -79,10 +79,6 @@ const Index = () => {
     if (data) setFaqs(data);
   };
 
-  useEffect(() => {
-    setIsVisible(true);
-  }, []);
-
   return (
     <div className="min-h-screen bg-background overflow-hidden">
       {/* Animated Background */}
@@ -90,8 +86,6 @@ const Index = () => {
         <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[120px] animate-pulse" />
         <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: "1s" }} />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/5 rounded-full blur-[150px] animate-pulse" style={{ animationDelay: "2s" }} />
-        
-        {/* Grid pattern */}
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:50px_50px]" />
       </div>
 
@@ -121,7 +115,6 @@ const Index = () => {
             "max-w-4xl mx-auto text-center transition-all duration-1000 transform",
             isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
           )}>
-            {/* Badge */}
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 rounded-full mb-8 animate-pulse">
               <Zap className="w-4 h-4 text-primary" />
               <span className="text-sm font-medium text-primary">Trusted by 50,000+ investors worldwide</span>
@@ -185,6 +178,30 @@ const Index = () => {
         </div>
       </section>
 
+      {/* Trust Badges */}
+      <section className="py-8 relative z-10 border-y border-border/30">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-wrap items-center justify-center gap-8 md:gap-16 opacity-60">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Shield className="w-5 h-5 text-primary" />
+              <span>256-bit SSL Encryption</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Lock className="w-5 h-5 text-primary" />
+              <span>Cold Storage Secured</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <CheckCircle className="w-5 h-5 text-primary" />
+              <span>KYC/AML Compliant</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Globe className="w-5 h-5 text-primary" />
+              <span>180+ Countries</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Live Chart Section */}
       <section className="py-12 relative z-10">
         <div className="container mx-auto px-4">
@@ -193,6 +210,50 @@ const Index = () => {
             isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
           )}>
             <CryptoChart className="max-w-4xl mx-auto glow-gold-sm" />
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works */}
+      <section className="py-20 relative z-10 bg-muted/20">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              How It <span className="text-gradient-gold">Works</span>
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Get started in three simple steps — no technical expertise required
+            </p>
+          </div>
+          <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+            {[
+              { step: "01", icon: Wallet, title: "Create & Fund", description: "Sign up in under 2 minutes. Deposit BTC directly from your wallet or exchange." },
+              { step: "02", icon: BarChart3, title: "Choose a Plan", description: "Select from our range of investment plans — from short-term to premium, tailored to your goals." },
+              { step: "03", icon: TrendingUp, title: "Earn Returns", description: "Watch your investment grow with daily profit settlements. Withdraw anytime after maturity." },
+            ].map((item, i) => (
+              <div
+                key={item.step}
+                className={cn(
+                  "relative text-center p-6 transition-all duration-700",
+                  isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
+                )}
+                style={{ transitionDelay: `${800 + i * 150}ms` }}
+              >
+                <div className="text-6xl font-black text-primary/10 absolute top-0 left-1/2 -translate-x-1/2">{item.step}</div>
+                <div className="relative z-10 mt-6">
+                  <div className="mx-auto mb-4 p-4 bg-primary/10 rounded-xl w-fit">
+                    <item.icon className="w-8 h-8 text-primary" />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2">{item.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{item.description}</p>
+                </div>
+                {i < 2 && (
+                  <div className="hidden md:block absolute top-1/2 -right-4 w-8 text-primary/30">
+                    <ArrowRight className="w-8 h-8" />
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -230,6 +291,45 @@ const Index = () => {
                 </div>
                 <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
                 <p className="text-muted-foreground text-sm">{feature.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials */}
+      <section className="py-20 relative z-10 bg-muted/20">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              What Our <span className="text-gradient-gold">Investors</span> Say
+            </h2>
+            <p className="text-muted-foreground">Real feedback from our community of investors</p>
+          </div>
+          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            {[
+              { name: "James K.", location: "United Kingdom", text: "I've been using BitCryptoTradingCo for over a year now. The returns are consistent and the platform is incredibly transparent.", rating: 5 },
+              { name: "Sarah M.", location: "United States", text: "The VIP Plan exceeded my expectations. Withdrawals are processed quickly and customer support is always responsive.", rating: 5 },
+              { name: "David O.", location: "Nigeria", text: "Finally a crypto investment platform that delivers what it promises. My portfolio has grown significantly since joining.", rating: 5 },
+            ].map((testimonial, i) => (
+              <div
+                key={testimonial.name}
+                className={cn(
+                  "bg-card/50 backdrop-blur-sm border border-border rounded-xl p-6 transition-all duration-700",
+                  isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
+                )}
+                style={{ transitionDelay: `${1000 + i * 100}ms` }}
+              >
+                <div className="flex gap-1 mb-4">
+                  {Array.from({ length: testimonial.rating }).map((_, j) => (
+                    <Star key={j} className="w-4 h-4 text-primary fill-primary" />
+                  ))}
+                </div>
+                <p className="text-sm text-muted-foreground mb-4 leading-relaxed italic">"{testimonial.text}"</p>
+                <div>
+                  <p className="font-semibold text-sm">{testimonial.name}</p>
+                  <p className="text-xs text-muted-foreground">{testimonial.location}</p>
+                </div>
               </div>
             ))}
           </div>
@@ -299,6 +399,7 @@ const Index = () => {
                 Create Free Account
                 <ArrowRight className="ml-2 w-5 h-5" />
               </Button>
+              <p className="text-xs text-muted-foreground mt-4">No credit card required · Start investing in under 2 minutes</p>
             </div>
           </div>
         </div>
@@ -328,9 +429,14 @@ const Index = () => {
                 </Link>
               </div>
             </div>
-            <p className="text-sm text-muted-foreground text-center">
-              © {new Date().getFullYear()} BitCryptoTradingCo. All rights reserved.
-            </p>
+            <div className="text-center space-y-2">
+              <p className="text-sm text-muted-foreground">
+                © {new Date().getFullYear()} BitCryptoTradingCo. All rights reserved.
+              </p>
+              <p className="text-xs text-muted-foreground/60">
+                Cryptocurrency investments carry risk. Past performance does not guarantee future results. Please invest responsibly.
+              </p>
+            </div>
           </div>
         </div>
       </footer>
