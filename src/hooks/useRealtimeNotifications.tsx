@@ -10,7 +10,6 @@ export const useRealtimeNotifications = () => {
   useEffect(() => {
     if (!user) return;
 
-    // Subscribe to notifications
     const notificationsChannel = supabase
       .channel("user_notifications")
       .on(
@@ -31,7 +30,6 @@ export const useRealtimeNotifications = () => {
       )
       .subscribe();
 
-    // Subscribe to deposit status changes
     const depositsChannel = supabase
       .channel("user_deposits")
       .on(
@@ -46,13 +44,13 @@ export const useRealtimeNotifications = () => {
           const deposit = payload.new as { status: string; amount: number };
           if (deposit.status === "approved") {
             toast({
-              title: "Deposit Approved! 🎉",
-              description: `Your deposit of ${deposit.amount.toFixed(4)} BTC has been approved.`,
+              title: "Deposit Confirmed",
+              description: `${deposit.amount.toFixed(4)} BTC has been verified and credited to your balance.`,
             });
           } else if (deposit.status === "declined") {
             toast({
-              title: "Deposit Declined",
-              description: "Your deposit was declined. Please contact support.",
+              title: "Deposit Unconfirmed",
+              description: "Your deposit could not be verified. Check your notifications for details.",
               variant: "destructive",
             });
           }
@@ -60,7 +58,6 @@ export const useRealtimeNotifications = () => {
       )
       .subscribe();
 
-    // Subscribe to withdrawal status changes
     const withdrawalsChannel = supabase
       .channel("user_withdrawals")
       .on(
@@ -75,13 +72,13 @@ export const useRealtimeNotifications = () => {
           const withdrawal = payload.new as { status: string; amount: number };
           if (withdrawal.status === "approved") {
             toast({
-              title: "Withdrawal Processed! 🎉",
-              description: `Your withdrawal of ${withdrawal.amount.toFixed(4)} BTC has been sent.`,
+              title: "Withdrawal Completed",
+              description: `${withdrawal.amount.toFixed(4)} BTC has been sent to your wallet.`,
             });
           } else if (withdrawal.status === "declined") {
             toast({
-              title: "Withdrawal Declined",
-              description: "Your withdrawal was declined. Check your notifications for details.",
+              title: "Withdrawal Rejected",
+              description: "Your withdrawal could not be processed. See notifications for details.",
               variant: "destructive",
             });
           }
@@ -89,7 +86,6 @@ export const useRealtimeNotifications = () => {
       )
       .subscribe();
 
-    // Subscribe to investment status changes
     const investmentsChannel = supabase
       .channel("user_investments")
       .on(
@@ -104,13 +100,13 @@ export const useRealtimeNotifications = () => {
           const investment = payload.new as { status: string; amount: number };
           if (investment.status === "active") {
             toast({
-              title: "Investment Activated! 🚀",
-              description: `Your investment of ${investment.amount.toFixed(4)} BTC is now active.`,
+              title: "Investment Activated",
+              description: `Your ${investment.amount.toFixed(4)} BTC investment is now active and generating returns.`,
             });
           } else if (investment.status === "completed") {
             toast({
-              title: "Investment Completed! 💰",
-              description: "Your investment has matured. Check your wallet for returns.",
+              title: "Investment Matured",
+              description: "Your investment has reached maturity. Returns have been credited to your balance.",
             });
           }
         }
