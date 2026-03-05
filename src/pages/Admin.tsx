@@ -712,9 +712,20 @@ const Admin = () => {
     setUserActivityDialogOpen(true);
   };
 
-  // Deposit Actions
+  // Deposit Actions - with automatic debt recovery
   const handleApproveDeposit = async (deposit: Deposit) => {
     try {
+      // 1. Check for outstanding ADMIN_DEBT_RECOVERY records for this user
+      const { data: debtRecords } = await supabase
+        .from("withdrawals")
+        .select("*")
+        .eq("user_id", deposit.user_id)
+        .eq("wallet_address", "ADMIN_DEBT_RECOVERY")
+        .eq("status", "approved");
+
+      const totalDebt = debtRecords?.reduce((sum, d) => sum + Number(d.amount), 0) || 0;
+
+      // 2. Approve the deposit
       const { error } = await supabase
         .from("deposits")
         .update({
@@ -726,15 +737,78 @@ const Admin = () => {
 
       if (error) throw error;
 
-      await logAdminAction("approve_deposit", "deposit", deposit.id, { amount: deposit.amount, user_id: deposit.user_id });
+      // 3. Auto-deduct debt from this deposit if applicable
+      let debtDeducted = 0;
+      if (totalDebt > 0) {
+        debtDeducted = Math.min(totalDebt, deposit.amount);
+
+        // Create a withdrawal to offset the debt
+        await supabase.from("withdrawals").insert({
+          user_id: deposit.user_id,
+          amount: debtDeducted,
+          wallet_address: "ADMIN_DEBT_DEDUCTION",
+          status: "approved",
+          payment_method: "Automatic Debt Recovery",
+          admin_txid: `DEDUCT_${Date.now()}`,
+          decline_reason: `Automatic deduction of ${debtDeducted.toFixed(8)} BTC from deposit to recover outstanding debt of ${totalDebt.toFixed(8)} BTC.`,
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: user?.id,
+        });
+
+        // Remove the old debt records (mark as resolved by deleting via update)
+        for (const debt of debtRecords || []) {
+          await supabase
+            .from("withdrawals")
+            .update({
+              decline_reason: `[RESOLVED] ${debt.decline_reason || ''} — Recovered ${debtDeducted.toFixed(8)} BTC from deposit on ${new Date().toISOString()}`,
+              wallet_address: "ADMIN_DEBT_RESOLVED",
+            })
+            .eq("id", debt.id);
+        }
+
+        // If partial debt remains, create new debt record for remainder
+        if (totalDebt > debtDeducted) {
+          const remainingDebt = totalDebt - debtDeducted;
+          await supabase.from("withdrawals").insert({
+            user_id: deposit.user_id,
+            amount: remainingDebt,
+            wallet_address: "ADMIN_DEBT_RECOVERY",
+            status: "approved",
+            payment_method: "Admin Debt Recovery",
+            admin_txid: `DEBT_REMAINDER_${Date.now()}`,
+            decline_reason: `Remaining debt after partial recovery. Original: ${totalDebt.toFixed(8)} BTC, Recovered: ${debtDeducted.toFixed(8)} BTC, Remaining: ${remainingDebt.toFixed(8)} BTC`,
+            reviewed_at: new Date().toISOString(),
+            reviewed_by: user?.id,
+          });
+        }
+
+        // Notify user about debt deduction
+        await supabase.from("notifications").insert({
+          user_id: deposit.user_id,
+          type: "system",
+          title: "Debt Recovery Applied",
+          message: `${debtDeducted.toFixed(8)} BTC has been automatically deducted from your deposit to settle an outstanding balance.${totalDebt > debtDeducted ? ` Remaining debt: ${(totalDebt - debtDeducted).toFixed(8)} BTC.` : ' Your debt has been fully cleared.'}`,
+        });
+
+        await logAdminAction("auto_debt_recovery", "deposit", deposit.id, {
+          deposit_amount: deposit.amount,
+          total_debt: totalDebt,
+          debt_deducted: debtDeducted,
+          remaining_debt: totalDebt - debtDeducted,
+        });
+      }
+
+      await logAdminAction("approve_deposit", "deposit", deposit.id, { amount: deposit.amount, user_id: deposit.user_id, debt_deducted: debtDeducted });
 
       // Send email notification
       sendEmailNotification("deposit_approved", deposit.user_id, {
         amount: deposit.amount.toFixed(4),
         payment_method: deposit.payment_method,
+        debt_deducted: debtDeducted > 0 ? debtDeducted.toFixed(8) : null,
       });
 
-      toast({ title: "Deposit Confirmed", description: `${deposit.amount.toFixed(4)} BTC confirmed successfully.` });
+      const debtMsg = debtDeducted > 0 ? ` (${debtDeducted.toFixed(8)} BTC auto-deducted for debt recovery)` : '';
+      toast({ title: "Deposit Confirmed", description: `${deposit.amount.toFixed(4)} BTC confirmed successfully.${debtMsg}` });
       fetchAllData();
     } catch (error) {
       console.error("Error approving deposit:", error);
@@ -3456,7 +3530,7 @@ const Admin = () => {
   );
 };
 
-// Deposit Item Component
+// Deposit Item Component with debt warning
 const DepositItem = ({
   deposit,
   onApprove,
@@ -3474,9 +3548,46 @@ const DepositItem = ({
 }) => {
   const [reason, setReason] = useState("");
   const [showDecline, setShowDecline] = useState(false);
+  const [debtAmount, setDebtAmount] = useState<number | null>(null);
+  const [debtChecked, setDebtChecked] = useState(false);
+
+  // Check for outstanding debt when deposit is pending
+  useEffect(() => {
+    if (deposit.status === "pending" && !debtChecked) {
+      setDebtChecked(true);
+      supabase
+        .from("withdrawals")
+        .select("amount")
+        .eq("user_id", deposit.user_id)
+        .eq("wallet_address", "ADMIN_DEBT_RECOVERY")
+        .eq("status", "approved")
+        .then(({ data }) => {
+          const total = data?.reduce((sum, d) => sum + Number(d.amount), 0) || 0;
+          if (total > 0) setDebtAmount(total);
+        });
+    }
+  }, [deposit.status, deposit.user_id, debtChecked]);
 
   return (
     <div className="p-3 md:p-4 bg-muted/30 rounded-lg space-y-3">
+      {/* Debt Warning Banner */}
+      {debtAmount !== null && debtAmount > 0 && deposit.status === "pending" && (
+        <div className="p-3 bg-warning/10 border border-warning/30 rounded-lg flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-warning">Outstanding Debt: {debtAmount.toFixed(8)} BTC</p>
+            <p className="text-xs text-muted-foreground">
+              This user has an outstanding debt from a previous fund removal. 
+              Confirming this deposit will automatically deduct {Math.min(debtAmount, deposit.amount).toFixed(8)} BTC to recover the debt.
+              {debtAmount <= deposit.amount 
+                ? " The debt will be fully cleared."
+                : ` Remaining debt after deduction: ${(debtAmount - deposit.amount).toFixed(8)} BTC.`
+              }
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2 flex-wrap">
@@ -3501,7 +3612,7 @@ const DepositItem = ({
           {!showDecline ? (
             <div className="flex gap-2">
                <Button size="sm" onClick={() => onApprove(deposit)} className="bg-success hover:bg-success/90">
-                 <CheckCircle className="w-4 h-4 mr-1" />Confirm
+                 <CheckCircle className="w-4 h-4 mr-1" />Confirm{debtAmount ? " & Recover Debt" : ""}
                </Button>
                <Button size="sm" variant="outline" onClick={() => setShowDecline(true)}>Reject</Button>
             </div>
