@@ -25,6 +25,7 @@ import ResetPassword from "./pages/ResetPassword";
 import LinkExpired from "./pages/LinkExpired";
 import DepositGuide from "./pages/DepositGuide";
 import CookieConsent from "./components/CookieConsent";
+import LiveChatWidget from "./components/LiveChatWidget";
 
 const queryClient = new QueryClient();
 
