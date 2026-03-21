@@ -897,6 +897,20 @@ const Auth = () => {
           </p>
         </CardContent>
       </Card>
+
+      {/* Footer */}
+      <div className="w-full max-w-md mt-6 text-center space-y-2">
+        <div className="flex flex-wrap justify-center gap-3 text-xs">
+          <Link to="/faq" className="text-muted-foreground hover:text-primary transition-colors">FAQ</Link>
+          <Link to="/deposit-guide" className="text-muted-foreground hover:text-primary transition-colors">How to Deposit</Link>
+          <Link to="/terms-of-service" className="text-muted-foreground hover:text-primary transition-colors">Terms of Service</Link>
+          <Link to="/privacy-policy" className="text-muted-foreground hover:text-primary transition-colors">Privacy Policy</Link>
+          <Link to="/risk-disclosure" className="text-muted-foreground hover:text-primary transition-colors">Risk Disclosure</Link>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          © {new Date().getFullYear()} BitCryptoTradingCo. All rights reserved.
+        </p>
+      </div>
     </div>
   );
 };

@@ -68,6 +68,68 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_conversations: {
+        Row: {
+          created_at: string
+          id: string
+          is_ai: boolean
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_ai?: boolean
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_ai?: boolean
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      chat_messages: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          id: string
+          message: string
+          sender_id: string | null
+          sender_type: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          id?: string
+          message: string
+          sender_id?: string | null
+          sender_type: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          message?: string
+          sender_id?: string | null
+          sender_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "chat_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deposit_addresses: {
         Row: {
           address: string
@@ -281,6 +343,42 @@ export type Database = {
           type?: string
           updated_at?: string
           wallet_address?: string | null
+        }
+        Relationships: []
+      }
+      price_alerts: {
+        Row: {
+          coin: string
+          created_at: string
+          direction: string
+          id: string
+          is_active: boolean
+          is_triggered: boolean
+          target_price: number
+          triggered_at: string | null
+          user_id: string
+        }
+        Insert: {
+          coin?: string
+          created_at?: string
+          direction: string
+          id?: string
+          is_active?: boolean
+          is_triggered?: boolean
+          target_price: number
+          triggered_at?: string | null
+          user_id: string
+        }
+        Update: {
+          coin?: string
+          created_at?: string
+          direction?: string
+          id?: string
+          is_active?: boolean
+          is_triggered?: boolean
+          target_price?: number
+          triggered_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }

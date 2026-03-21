@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import LiveChatAdmin from "@/components/LiveChatAdmin";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -2092,6 +2093,7 @@ const Admin = () => {
             <TabsTrigger value="add-funds" className="text-xs md:text-sm">Add Funds</TabsTrigger>
             <TabsTrigger value="remove-funds" className="text-xs md:text-sm">Remove Funds</TabsTrigger>
             <TabsTrigger value="settings" className="text-xs md:text-sm">Settings</TabsTrigger>
+            <TabsTrigger value="live-chat" className="text-xs md:text-sm">Live Chat</TabsTrigger>
           </TabsList>
 
           {/* Deposits Tab */}
@@ -3208,6 +3210,11 @@ const Admin = () => {
                 </Button>
               </div>
             </div>
+          </TabsContent>
+
+          {/* Live Chat Tab */}
+          <TabsContent value="live-chat">
+            <LiveChatAdmin />
           </TabsContent>
         </Tabs>
       </div>
