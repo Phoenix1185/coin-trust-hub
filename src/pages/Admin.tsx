@@ -2092,6 +2092,7 @@ const Admin = () => {
             <TabsTrigger value="add-funds" className="text-xs md:text-sm">Add Funds</TabsTrigger>
             <TabsTrigger value="remove-funds" className="text-xs md:text-sm">Remove Funds</TabsTrigger>
             <TabsTrigger value="settings" className="text-xs md:text-sm">Settings</TabsTrigger>
+            <TabsTrigger value="live-chat" className="text-xs md:text-sm">Live Chat</TabsTrigger>
           </TabsList>
 
           {/* Deposits Tab */}
