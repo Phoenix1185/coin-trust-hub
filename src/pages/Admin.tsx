@@ -584,6 +584,9 @@ const Admin = () => {
           if (setting.setting_key === "deposits_enabled") {
             setDepositsEnabled(setting.setting_value as unknown as boolean);
           }
+          if (setting.setting_key === "company_address") {
+            setCompanyAddress(setting.setting_value as unknown as string);
+          }
         });
       }
     } catch (error) {
