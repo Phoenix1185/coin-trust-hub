@@ -1853,6 +1853,7 @@ const Admin = () => {
         { key: "landing_stats", value: landingStats },
         { key: "withdrawals_enabled", value: withdrawalSettings.withdrawals_enabled },
         { key: "deposits_enabled", value: depositsEnabled },
+        { key: "company_address", value: companyAddress },
       ];
 
       for (const { key, value } of settingsToSave) {
