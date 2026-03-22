@@ -4,6 +4,7 @@ import Logo from "@/components/Logo";
 import CryptoChart from "@/components/CryptoChart";
 import LiveTicker from "@/components/LiveTicker";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ArrowRight, Shield, TrendingUp, Users, Zap, Lock, Globe, ChevronDown, HelpCircle, CheckCircle, Wallet, BarChart3, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
