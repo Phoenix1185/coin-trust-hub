@@ -68,6 +68,51 @@ export type Database = {
         }
         Relationships: []
       }
+      blog_posts: {
+        Row: {
+          author: string
+          category: string | null
+          content: string
+          created_at: string
+          excerpt: string | null
+          featured_image: string | null
+          id: string
+          is_published: boolean | null
+          published_at: string | null
+          slug: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          author?: string
+          category?: string | null
+          content: string
+          created_at?: string
+          excerpt?: string | null
+          featured_image?: string | null
+          id?: string
+          is_published?: boolean | null
+          published_at?: string | null
+          slug: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          author?: string
+          category?: string | null
+          content?: string
+          created_at?: string
+          excerpt?: string | null
+          featured_image?: string | null
+          id?: string
+          is_published?: boolean | null
+          published_at?: string | null
+          slug?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       chat_conversations: {
         Row: {
           created_at: string
@@ -125,6 +170,41 @@ export type Database = {
             foreignKeyName: "chat_messages_conversation_id_fkey"
             columns: ["conversation_id"]
             isOneToOne: false
+            referencedRelation: "chat_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_ratings: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          feedback: string | null
+          id: string
+          rating: number
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          feedback?: string | null
+          id?: string
+          rating: number
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          feedback?: string | null
+          id?: string
+          rating?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_ratings_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: true
             referencedRelation: "chat_conversations"
             referencedColumns: ["id"]
           },
@@ -268,6 +348,84 @@ export type Database = {
         }
         Relationships: []
       }
+      newsletter_subscribers: {
+        Row: {
+          email: string
+          id: string
+          is_active: boolean | null
+          subscribed_at: string
+          unsubscribed_at: string | null
+        }
+        Insert: {
+          email: string
+          id?: string
+          is_active?: boolean | null
+          subscribed_at?: string
+          unsubscribed_at?: string | null
+        }
+        Update: {
+          email?: string
+          id?: string
+          is_active?: boolean | null
+          subscribed_at?: string
+          unsubscribed_at?: string | null
+        }
+        Relationships: []
+      }
+      notification_preferences: {
+        Row: {
+          admin_announcements: boolean | null
+          created_at: string
+          deposit_notifications: boolean | null
+          do_not_disturb_enabled: boolean | null
+          do_not_disturb_until: string | null
+          id: string
+          investment_maturity_notifications: boolean | null
+          price_alert_notifications: boolean | null
+          quiet_hours_enabled: boolean | null
+          quiet_hours_end: string | null
+          quiet_hours_start: string | null
+          updated_at: string
+          user_id: string
+          vibration_enabled: boolean | null
+          withdrawal_notifications: boolean | null
+        }
+        Insert: {
+          admin_announcements?: boolean | null
+          created_at?: string
+          deposit_notifications?: boolean | null
+          do_not_disturb_enabled?: boolean | null
+          do_not_disturb_until?: string | null
+          id?: string
+          investment_maturity_notifications?: boolean | null
+          price_alert_notifications?: boolean | null
+          quiet_hours_enabled?: boolean | null
+          quiet_hours_end?: string | null
+          quiet_hours_start?: string | null
+          updated_at?: string
+          user_id: string
+          vibration_enabled?: boolean | null
+          withdrawal_notifications?: boolean | null
+        }
+        Update: {
+          admin_announcements?: boolean | null
+          created_at?: string
+          deposit_notifications?: boolean | null
+          do_not_disturb_enabled?: boolean | null
+          do_not_disturb_until?: string | null
+          id?: string
+          investment_maturity_notifications?: boolean | null
+          price_alert_notifications?: boolean | null
+          quiet_hours_enabled?: boolean | null
+          quiet_hours_end?: string | null
+          quiet_hours_start?: string | null
+          updated_at?: string
+          user_id?: string
+          vibration_enabled?: boolean | null
+          withdrawal_notifications?: boolean | null
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string
@@ -345,6 +503,71 @@ export type Database = {
           wallet_address?: string | null
         }
         Relationships: []
+      }
+      price_alert_history: {
+        Row: {
+          alert_id: string
+          coin: string
+          created_at: string
+          direction: string
+          entry_price: number | null
+          id: string
+          notes: string | null
+          notification_sent: boolean | null
+          profit_loss: number | null
+          profit_loss_amount: number | null
+          target_price: number
+          triggered_at: string
+          triggered_price: number
+          updated_at: string
+          user_action: string | null
+          user_id: string
+        }
+        Insert: {
+          alert_id: string
+          coin?: string
+          created_at?: string
+          direction: string
+          entry_price?: number | null
+          id?: string
+          notes?: string | null
+          notification_sent?: boolean | null
+          profit_loss?: number | null
+          profit_loss_amount?: number | null
+          target_price: number
+          triggered_at?: string
+          triggered_price: number
+          updated_at?: string
+          user_action?: string | null
+          user_id: string
+        }
+        Update: {
+          alert_id?: string
+          coin?: string
+          created_at?: string
+          direction?: string
+          entry_price?: number | null
+          id?: string
+          notes?: string | null
+          notification_sent?: boolean | null
+          profit_loss?: number | null
+          profit_loss_amount?: number | null
+          target_price?: number
+          triggered_at?: string
+          triggered_price?: number
+          updated_at?: string
+          user_action?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "price_alert_history_alert_id_fkey"
+            columns: ["alert_id"]
+            isOneToOne: false
+            referencedRelation: "price_alerts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       price_alerts: {
         Row: {

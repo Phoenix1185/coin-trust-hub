@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import LiveChatAdmin from "@/components/LiveChatAdmin";
+import BlogAdmin from "@/components/BlogAdmin";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -292,6 +293,7 @@ const Admin = () => {
   });
 
   // Settings state
+  const [companyAddress, setCompanyAddress] = useState("123 Crypto Street, New York, NY 10001");
   const [contactInfo, setContactInfo] = useState<ContactInfo>({
     email: "support@bitcryptotradingco.com",
     phone: "+1 (888) 123-4567",
@@ -581,6 +583,9 @@ const Admin = () => {
           }
           if (setting.setting_key === "deposits_enabled") {
             setDepositsEnabled(setting.setting_value as unknown as boolean);
+          }
+          if (setting.setting_key === "company_address") {
+            setCompanyAddress(setting.setting_value as unknown as string);
           }
         });
       }
@@ -1848,6 +1853,7 @@ const Admin = () => {
         { key: "landing_stats", value: landingStats },
         { key: "withdrawals_enabled", value: withdrawalSettings.withdrawals_enabled },
         { key: "deposits_enabled", value: depositsEnabled },
+        { key: "company_address", value: companyAddress },
       ];
 
       for (const { key, value } of settingsToSave) {
@@ -2094,6 +2100,7 @@ const Admin = () => {
             <TabsTrigger value="remove-funds" className="text-xs md:text-sm">Remove Funds</TabsTrigger>
             <TabsTrigger value="settings" className="text-xs md:text-sm">Settings</TabsTrigger>
             <TabsTrigger value="live-chat" className="text-xs md:text-sm">Live Chat</TabsTrigger>
+            <TabsTrigger value="blog" className="text-xs md:text-sm">Blog</TabsTrigger>
           </TabsList>
 
           {/* Deposits Tab */}
@@ -3203,6 +3210,17 @@ const Admin = () => {
                 </CardContent>
               </Card>
 
+              {/* Company Address */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg md:text-xl">Company Address</CardTitle>
+                  <CardDescription>Displayed on the landing page and About page</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Input value={companyAddress} onChange={(e) => setCompanyAddress(e.target.value)} placeholder="123 Crypto Street, New York, NY 10001" />
+                </CardContent>
+              </Card>
+
               <div className="flex justify-end">
                 <Button onClick={handleSaveSettings} disabled={isSavingSettings} className="bg-primary hover:bg-primary/90">
                   <Save className="w-4 h-4 mr-2" />
@@ -3215,6 +3233,11 @@ const Admin = () => {
           {/* Live Chat Tab */}
           <TabsContent value="live-chat">
             <LiveChatAdmin />
+          </TabsContent>
+
+          {/* Blog Tab */}
+          <TabsContent value="blog">
+            <BlogAdmin />
           </TabsContent>
         </Tabs>
       </div>
