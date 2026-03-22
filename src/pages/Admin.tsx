@@ -3218,6 +3218,11 @@ const Admin = () => {
           <TabsContent value="live-chat">
             <LiveChatAdmin />
           </TabsContent>
+
+          {/* Blog Tab */}
+          <TabsContent value="blog">
+            <BlogAdmin />
+          </TabsContent>
         </Tabs>
       </div>
 
