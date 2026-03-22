@@ -293,6 +293,7 @@ const Admin = () => {
   });
 
   // Settings state
+  const [companyAddress, setCompanyAddress] = useState("123 Crypto Street, New York, NY 10001");
   const [contactInfo, setContactInfo] = useState<ContactInfo>({
     email: "support@bitcryptotradingco.com",
     phone: "+1 (888) 123-4567",
