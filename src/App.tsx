@@ -24,6 +24,10 @@ import EmailVerified from "./pages/EmailVerified";
 import ResetPassword from "./pages/ResetPassword";
 import LinkExpired from "./pages/LinkExpired";
 import DepositGuide from "./pages/DepositGuide";
+import About from "./pages/About";
+import Blog from "./pages/Blog";
+import Guides from "./pages/Guides";
+import CookiePolicy from "./pages/CookiePolicy";
 import CookieConsent from "./components/CookieConsent";
 import LiveChatWidget from "./components/LiveChatWidget";
 
@@ -51,7 +55,11 @@ const App = () => (
             <Route path="/terms-of-service" element={<TermsOfService />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/risk-disclosure" element={<RiskDisclosure />} />
+            <Route path="/cookie-policy" element={<CookiePolicy />} />
             <Route path="/faq" element={<FAQ />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/blog" element={<Blog />} />
+            <Route path="/guides" element={<Guides />} />
             <Route path="/email-verified" element={<EmailVerified />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/link-expired" element={<LinkExpired />} />
