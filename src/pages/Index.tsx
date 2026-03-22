@@ -36,6 +36,7 @@ const Index = () => {
   const { user, isLoading } = useAuth();
   const [isVisible, setIsVisible] = useState(false);
   const [faqs, setFaqs] = useState<FAQ[]>([]);
+  const [companyAddress, setCompanyAddress] = useState("123 Crypto Street, New York, NY 10001");
   const [landingStats, setLandingStats] = useState<LandingStats>({
     stat1_value: "$2.5B+",
     stat1_label: "Assets Managed",
@@ -55,7 +56,17 @@ const Index = () => {
     setIsVisible(true);
     fetchFAQs();
     fetchLandingStats();
+    fetchCompanyAddress();
   }, []);
+
+  const fetchCompanyAddress = async () => {
+    const { data } = await supabase
+      .from("site_settings")
+      .select("setting_value")
+      .eq("setting_key", "company_address")
+      .single();
+    if (data?.setting_value) setCompanyAddress(data.setting_value as string);
+  };
 
   const fetchLandingStats = async () => {
     const { data } = await supabase
