@@ -3210,6 +3210,17 @@ const Admin = () => {
                 </CardContent>
               </Card>
 
+              {/* Company Address */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg md:text-xl">Company Address</CardTitle>
+                  <CardDescription>Displayed on the landing page and About page</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Input value={companyAddress} onChange={(e) => setCompanyAddress(e.target.value)} placeholder="123 Crypto Street, New York, NY 10001" />
+                </CardContent>
+              </Card>
+
               <div className="flex justify-end">
                 <Button onClick={handleSaveSettings} disabled={isSavingSettings} className="bg-primary hover:bg-primary/90">
                   <Save className="w-4 h-4 mr-2" />
