@@ -405,42 +405,98 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-border py-8 relative z-10">
+      {/* Newsletter Section */}
+      <section className="py-16 relative z-10 bg-muted/20">
         <div className="container mx-auto px-4">
-          <div className="flex flex-col gap-6">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="max-w-xl mx-auto text-center">
+            <h2 className="text-2xl md:text-3xl font-bold mb-3">Stay Updated</h2>
+            <p className="text-muted-foreground mb-6">Get the latest crypto news and investment tips delivered to your inbox.</p>
+            <NewsletterForm />
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t border-border py-12 relative z-10">
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+            <div>
+              <h4 className="font-semibold mb-4 text-sm">Company</h4>
+              <ul className="space-y-2 text-sm">
+                <li><Link to="/about" className="text-muted-foreground hover:text-primary transition-colors">About</Link></li>
+                <li><Link to="/investments" className="text-muted-foreground hover:text-primary transition-colors">Investment Plans</Link></li>
+                <li><a href="#features" className="text-muted-foreground hover:text-primary transition-colors">How It Works</a></li>
+                <li><Link to="/support" className="text-muted-foreground hover:text-primary transition-colors">Contact</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-4 text-sm">Resources</h4>
+              <ul className="space-y-2 text-sm">
+                <li><Link to="/faq" className="text-muted-foreground hover:text-primary transition-colors">FAQ</Link></li>
+                <li><Link to="/blog" className="text-muted-foreground hover:text-primary transition-colors">Blog</Link></li>
+                <li><Link to="/guides" className="text-muted-foreground hover:text-primary transition-colors">Guides</Link></li>
+                <li><Link to="/support" className="text-muted-foreground hover:text-primary transition-colors">Support</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-4 text-sm">Legal</h4>
+              <ul className="space-y-2 text-sm">
+                <li><Link to="/terms-of-service" className="text-muted-foreground hover:text-primary transition-colors">Terms of Service</Link></li>
+                <li><Link to="/privacy-policy" className="text-muted-foreground hover:text-primary transition-colors">Privacy Policy</Link></li>
+                <li><Link to="/cookie-policy" className="text-muted-foreground hover:text-primary transition-colors">Cookie Policy</Link></li>
+                <li><Link to="/risk-disclosure" className="text-muted-foreground hover:text-primary transition-colors">Risk Disclosure</Link></li>
+              </ul>
+            </div>
+            <div>
               <Logo size="sm" />
-              <div className="flex flex-wrap justify-center gap-4 text-sm">
-                <Link to="/faq" className="text-muted-foreground hover:text-primary transition-colors">
-                  FAQ
-                </Link>
-                <Link to="/deposit-guide" className="text-muted-foreground hover:text-primary transition-colors">
-                  How to Deposit
-                </Link>
-                <Link to="/terms-of-service" className="text-muted-foreground hover:text-primary transition-colors">
-                  Terms of Service
-                </Link>
-                <Link to="/privacy-policy" className="text-muted-foreground hover:text-primary transition-colors">
-                  Privacy Policy
-                </Link>
-                <Link to="/risk-disclosure" className="text-muted-foreground hover:text-primary transition-colors">
-                  Risk Disclosure
-                </Link>
-              </div>
-            </div>
-            <div className="text-center space-y-2">
-              <p className="text-sm text-muted-foreground">
-                © {new Date().getFullYear()} BitCryptoTradingCo. All rights reserved.
+              <p className="text-xs text-muted-foreground mt-3 leading-relaxed">
+                Your trusted partner in cryptocurrency investment. Secure, transparent, and profitable.
               </p>
-              <p className="text-xs text-muted-foreground/60">
-                Cryptocurrency investments carry risk. Past performance does not guarantee future results. Please invest responsibly.
-              </p>
+              <p className="text-xs text-muted-foreground mt-2">{companyAddress}</p>
             </div>
+          </div>
+          <div className="border-t border-border pt-6 text-center space-y-2">
+            <p className="text-sm text-muted-foreground">
+              © {new Date().getFullYear()} BitCryptoTradingCo. All rights reserved.
+            </p>
+            <p className="text-xs text-muted-foreground/60">
+              Cryptocurrency investments carry risk. Past performance does not guarantee future results. Please invest responsibly.
+            </p>
           </div>
         </div>
       </footer>
     </div>
+  );
+};
+
+// Newsletter form component
+const NewsletterForm = () => {
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+
+  const handleSubscribe = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setStatus("loading");
+    const { error } = await supabase.from("newsletter_subscribers").insert({ email: email.trim() });
+    if (error) {
+      if (error.code === "23505") setStatus("success"); // already subscribed
+      else setStatus("error");
+    } else {
+      setStatus("success");
+    }
+    setTimeout(() => setStatus("idle"), 3000);
+    setEmail("");
+  };
+
+  return (
+    <form onSubmit={handleSubscribe} className="flex gap-2 max-w-md mx-auto">
+      <Input value={email} onChange={(e) => setEmail(e.target.value)} type="email"
+        placeholder="Enter your email address" className="flex-1" required />
+      <Button type="submit" disabled={status === "loading"} className="bg-primary text-primary-foreground hover:bg-primary/90">
+        {status === "loading" ? "..." : status === "success" ? "Subscribed!" : "Subscribe"}
+      </Button>
+    </form>
   );
 };
 
