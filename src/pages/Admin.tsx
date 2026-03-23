@@ -3241,6 +3241,11 @@ const Admin = () => {
           <TabsContent value="blog">
             <BlogAdmin />
           </TabsContent>
+
+          {/* Email Templates Tab */}
+          <TabsContent value="email-templates">
+            <EmailTemplatesAdmin />
+          </TabsContent>
         </Tabs>
       </div>
 
