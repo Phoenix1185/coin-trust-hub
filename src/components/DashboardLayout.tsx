@@ -195,7 +195,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         {/* Dashboard Footer */}
         <footer className="border-t border-border py-4 px-4 lg:px-6 bg-card/30">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
-            <p>© 2024 BitCryptoTradingCo</p>
+            <p>© {new Date().getFullYear()} BitCryptoTradingCo</p>
             <div className="flex flex-wrap justify-center gap-3">
               <Link to="/terms-of-service" className="hover:text-primary transition-colors">
                 Terms
