@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import LiveChatAdmin from "@/components/LiveChatAdmin";
 import BlogAdmin from "@/components/BlogAdmin";
+import EmailTemplatesAdmin from "@/components/EmailTemplatesAdmin";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import DashboardLayout from "@/components/DashboardLayout";
