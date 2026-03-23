@@ -179,7 +179,7 @@ const FAQ = () => {
 
         {/* Footer Links */}
         <div className="mt-12 pt-8 border-t border-border">
-          <div className="flex flex-wrap justify-center gap-4 text-sm text-muted-foreground">
+          <div className="flex flex-wrap justify-center gap-4 text-sm text-muted-foreground mb-4">
             <Link to="/terms-of-service" className="hover:text-primary transition-colors">
               Terms of Service
             </Link>
@@ -193,6 +193,7 @@ const FAQ = () => {
               How to Deposit
             </Link>
           </div>
+          <p className="text-center text-xs text-muted-foreground">© {new Date().getFullYear()} BitCryptoTradingCo. All rights reserved.</p>
         </div>
       </div>
     </div>

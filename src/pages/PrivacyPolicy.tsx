@@ -181,11 +181,12 @@ const PrivacyPolicy = () => {
         </div>
 
         <div className="mt-12 pt-8 border-t border-border">
-          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-4">
             <Link to="/terms-of-service" className="hover:text-primary transition-colors">Terms of Service</Link>
             <Link to="/risk-disclosure" className="hover:text-primary transition-colors">Risk Disclosure</Link>
             <Link to="/support" className="hover:text-primary transition-colors">Contact Support</Link>
           </div>
+          <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} BitCryptoTradingCo. All rights reserved.</p>
         </div>
       </div>
     </div>
